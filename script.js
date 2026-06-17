@@ -51,6 +51,8 @@ async function enviarReserva() {
     }
 
     let nombre = document.getElementById("nombre").value.trim();
+    let edad = document.getElementById("edad").value.trim();
+    let distrito = document.getElementById("distrito").value.trim();
     let correo = document.getElementById("correo").value.trim();
     let whatsapp = document.getElementById("whatsapp").value.trim();
     let posicion = document.getElementById("posicion").value;
@@ -143,6 +145,8 @@ if (!usarPerfil && perfilPrevio) {
 
     let nuevoJugador = {
     nombre: usarPerfil && perfilPrevio ? perfilPrevio.nombre : nombre,
+    edad: edad,
+    distrito: distrito,
     correo: usarPerfil && perfilPrevio ? perfilPrevio.correo : correo,
     whatsapp: whatsapp,
     jugadorId: usarPerfil && perfilPrevio ? perfilPrevio.jugadorId : whatsapp,
@@ -869,6 +873,14 @@ async function guardarJugadorFirebase(jugador) {
     nombre: {
         stringValue: jugador.nombre
     },
+
+    edad: {
+    integerValue: Number(jugador.edad || 0)
+},
+distrito: {
+    stringValue: jugador.distrito || "No definido"
+},
+
     correo: {
         stringValue: jugador.correo
     },
@@ -1755,11 +1767,17 @@ async function guardarPerfilJugadorFirebase(jugador) {
             datos = {
                 fields: {
                     nombre: {
-                        stringValue: jugador.nombre
-                    },
-                    correo: {
-                        stringValue: jugador.correo
-                    },
+    stringValue: jugador.nombre
+},
+edad: {
+    integerValue: Number(jugador.edad || 0)
+},
+distrito: {
+    stringValue: jugador.distrito || "No definido"
+},
+correo: {
+    stringValue: jugador.correo
+},
                     whatsapp: {
     stringValue: jugador.whatsapp
 },
@@ -1782,15 +1800,15 @@ posicion: {
             };
 
             const respuesta = await fetch(
-                url + "&updateMask.fieldPaths=nombre&updateMask.fieldPaths=correo&updateMask.fieldPaths=whatsapp&updateMask.fieldPaths=jugadorId&updateMask.fieldPaths=posicion&updateMask.fieldPaths=nivel&updateMask.fieldPaths=pieDominante&updateMask.fieldPaths=actualizadoEn",
-                {
-                    method: "PATCH",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(datos)
-                }
-            );
+    url + "&updateMask.fieldPaths=nombre&updateMask.fieldPaths=edad&updateMask.fieldPaths=distrito&updateMask.fieldPaths=correo",
+    {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(datos)
+    }
+);
 
             const resultado = await respuesta.json();
 
@@ -1803,13 +1821,19 @@ posicion: {
         } else {
 
             datos = {
-                fields: {
-                    nombre: {
-                        stringValue: jugador.nombre
-                    },
-                    correo: {
-                        stringValue: jugador.correo
-                    },
+    fields: {
+        nombre: {
+            stringValue: jugador.nombre
+        },
+        edad: {
+            integerValue: Number(jugador.edad || 0)
+        },
+        distrito: {
+            stringValue: jugador.distrito || "No definido"
+        },
+        correo: {
+            stringValue: jugador.correo
+        },
                     whatsapp: {
                         stringValue: jugador.whatsapp
                     },
@@ -2028,6 +2052,8 @@ async function obtenerPerfilPorWhatsapp(whatsapp) {
 
     return {
         nombre: data.fields.nombre?.stringValue || "",
+        edad: Number(data.fields.edad?.integerValue || 0),
+        distrito: data.fields.distrito?.stringValue || "No definido",
         correo: data.fields.correo?.stringValue || "",
         whatsapp: data.fields.whatsapp?.stringValue || whatsapp,
         jugadorId: data.fields.jugadorId?.stringValue || whatsapp,
@@ -2068,6 +2094,9 @@ async function buscarMiPerfil() {
         resultado.innerHTML = `
             <div class="perfil-resultado-card">
                 <h3>${perfil.nombre || "Jugador Liga Dorada"}</h3>
+
+                <p><strong>Edad:</strong> ${perfil.edad || "No definida"}</p>
+                <p><strong>Distrito:</strong> ${perfil.distrito || "No definido"}</p>
 
                 <p><strong>ID jugador:</strong> ${perfil.jugadorId || perfil.whatsapp || whatsapp}</p>
                 <p><strong>WhatsApp:</strong> ${perfil.whatsapp || whatsapp}</p>
