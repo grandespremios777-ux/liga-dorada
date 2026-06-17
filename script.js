@@ -2008,3 +2008,93 @@ document.addEventListener("keydown", function(event) {
         palabraSecretaAdmin = "";
     }
 });
+
+async function obtenerPerfilPorWhatsapp(whatsapp) {
+    const projectId = window.firebaseConfig.projectId;
+
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/jugadoresPerfil/${whatsapp}`;
+
+    const respuesta = await fetch(url);
+
+    if (!respuesta.ok) {
+        return null;
+    }
+
+    const data = await respuesta.json();
+
+    if (!data.fields) {
+        return null;
+    }
+
+    return {
+        nombre: data.fields.nombre?.stringValue || "",
+        correo: data.fields.correo?.stringValue || "",
+        whatsapp: data.fields.whatsapp?.stringValue || whatsapp,
+        jugadorId: data.fields.jugadorId?.stringValue || whatsapp,
+        posicion: data.fields.posicion?.stringValue || "",
+        nivel: Number(data.fields.nivel?.integerValue || 1),
+        pieDominante: data.fields.pieDominante?.stringValue || "",
+        partidosJugados: Number(data.fields.partidosJugados?.integerValue || 0),
+        goles: Number(data.fields.goles?.integerValue || 0),
+        puntos: Number(data.fields.puntos?.integerValue || 0)
+    };
+}
+
+
+async function buscarMiPerfil() {
+    const whatsapp = document.getElementById("whatsappPerfil").value.trim();
+    const resultado = document.getElementById("resultadoMiPerfil");
+
+    if (!whatsapp) {
+        resultado.innerHTML = "<p class='error'>Ingresa tu WhatsApp para buscar tu perfil.</p>";
+        return;
+    }
+
+    if (!/^9\d{8}$/.test(whatsapp)) {
+        resultado.innerHTML = "<p class='error'>El WhatsApp debe tener 9 dígitos y empezar con 9.</p>";
+        return;
+    }
+
+    try {
+        const perfil = await obtenerPerfilPorWhatsapp(whatsapp);
+
+        if (!perfil) {
+            resultado.innerHTML = "<p class='error'>No encontramos un perfil Liga Dorada con ese WhatsApp.</p>";
+            return;
+        }
+
+        const inscripcionActual = jugadores.find(jugador => jugador.whatsapp === whatsapp);
+
+        resultado.innerHTML = `
+            <div class="perfil-resultado-card">
+                <h3>${perfil.nombre || "Jugador Liga Dorada"}</h3>
+
+                <p><strong>ID jugador:</strong> ${perfil.jugadorId || perfil.whatsapp || whatsapp}</p>
+                <p><strong>WhatsApp:</strong> ${perfil.whatsapp || whatsapp}</p>
+                <p><strong>Correo:</strong> ${perfil.correo || "No registrado"}</p>
+
+                <hr>
+
+                <p><strong>Nivel:</strong> ${perfil.nivel || 1} ⭐</p>
+                <p><strong>Posición registrada:</strong> ${perfil.posicion || "No registrada"}</p>
+                <p><strong>Pie dominante:</strong> ${perfil.pieDominante || "No registrado"}</p>
+
+                <hr>
+
+<p><strong>Estado en pichanga actual:</strong> ${inscripcionActual ? inscripcionActual.estado : "No inscrito actualmente"}</p>
+<p><strong>Equipo actual:</strong> ${inscripcionActual ? inscripcionActual.equipo : "Sin equipo actual"}</p>
+<p><strong>Posición en esta pichanga:</strong> ${inscripcionActual ? inscripcionActual.posicion : "No inscrito"}</p>
+
+                <hr>
+
+                <p><strong>Partidos jugados:</strong> ${perfil.partidosJugados || 0}</p>
+                <p><strong>Goles:</strong> ${perfil.goles || 0}</p>
+                <p><strong>Puntos:</strong> ${perfil.puntos || 0}</p>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error("Error buscando perfil:", error);
+        resultado.innerHTML = "<p class='error'>Ocurrió un error al buscar tu perfil. Intenta nuevamente.</p>";
+    }
+}
