@@ -425,3 +425,40 @@ footer{
     opacity: 0.9;
     line-height: 1.4;
 }
+
+/* Responsive equipos en celular */
+@media (max-width: 768px) {
+
+    .equipos-container {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 25px;
+        width: 100%;
+    }
+
+    .equipo-card {
+        width: 90%;
+        max-width: 360px;
+        margin: 0 auto;
+    }
+
+    .versus {
+        margin: 5px 0;
+        font-size: 34px;
+        text-align: center;
+    }
+
+    #lista-equipo-a li,
+    #lista-equipo-b li {
+        width: 100%;
+        box-sizing: border-box;
+        text-align: left;
+    }
+
+    #lista-equipo-a,
+    #lista-equipo-b {
+        width: 100%;
+        padding: 0;
+    }
+}
