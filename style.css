@@ -503,3 +503,7 @@ footer{
         text-align: left;
     }
 }
+
+#btn-admin-login {
+    display: none;
+}
