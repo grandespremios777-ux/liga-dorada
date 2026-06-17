@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liga Dorada</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="hero">
+        <div class="overlay">
+            <h1>LIGA DORADA</h1>
+            <p class="slogan">Donde los goles cuentan</p>
+            <p class="subtitle">
+                Juega. Compite. Asciende.
+            </p>
+
+            <a href="#partido" class="btn-gold">
+                Reservar Cupo
+   
+</a>
+
+</div>
+</header>
+
+
+   <section id="partido" class="section">
+    <h2>🏆 Próxima Pichanga</h2>
+
+    <div class="card">
+
+      <h3 id="partido-modalidad">⚽ Fulbito 9 vs 9</h3>
+
+<p>📍 <span id="partido-cancha">Cancha La 12</span></p>
+
+<p>🕐 <span id="partido-hora">Jueves 10:30 PM</span></p>
+
+<p>💰 <span id="partido-precio">S/18 por jugador</span></p>
+
+<p>👥 <span id="contador-inscritos">0</span> / 18 inscritos</p>
+
+
+
+<button class="btn-gold" onclick="reservarCupo()">
+    Reservar Ahora
+</button>
+
+<br><br>
+
+<button id="btn-admin-login" class="btn-admin-login" onclick="activarAdmin()">
+    Modo Administrador
+</button>
+
+<br><br>
+
+    </div>
+</section>
+
+<section id="formulario" class="section" style="display:none;">
+    <h2>⚽ Reserva tu Cupo</h2>
+
+    <div class="card">
+
+        <div class="opcion-perfil">
+    <label>
+        <input type="checkbox" id="usarPerfilLigaDorada">
+        Usar mi perfil Liga Dorada
+    </label>
+
+    <p class="texto-ayuda-perfil">
+        Si ya tienes perfil, solo usaremos tu WhatsApp para cargar tus datos.
+    </p>
+</div>
+
+<div id="mensajePerfilEncontrado" class="mensaje-perfil-encontrado"></div>
+
+        <input type="text" id="nombre" placeholder="Nombre completo">
+
+        <br><br>
+
+        <input type="email" id="correo" placeholder="Correo electrónico">
+
+        <br><br>
+
+        <input type="text" id="whatsapp" placeholder="WhatsApp">
+
+        <br><br>
+
+        <select id="posicion">
+            <option>Arquero</option>
+            <option>Defensa</option>
+            <option>Volante</option>
+            <option>Delantero</option>
+        </select>
+
+        <label id="labelPieDominante" for="pieDominante">Pie dominante</label>
+
+<select id="pieDominante">
+    <option value="">Selecciona tu pie dominante</option>
+    <option value="Der">Derecho</option>
+    <option value="Izq">Izquierdo</option>
+</select>
+
+<br><br>
+
+<select id="equipo">
+    <option value="A">Equipo A</option>
+    <option value="B">Equipo B</option>
+</select>
+
+        <br><br>
+
+  <button id="btn-enviar" class="btn-gold" onclick="enviarReserva()">
+    Enviar
+</button>
+
+    </div>
+</section>
+
+<section id="inscritos" class="section">
+
+    <h2>⚔️ Equipos Confirmados</h2>
+
+    <div class="versus-container">
+
+        <div class="equipo-card">
+            <h3>🟡 Equipo A</h3>
+            <p><span id="contador-equipo-a">0</span>/9 jugadores</p>
+
+            <ul id="lista-equipo-a">
+
+            </ul>
+        </div>
+
+        <div class="vs">
+            VS
+        </div>
+
+        <div class="equipo-card">
+            <h3>⚫ Equipo B</h3>
+            <p><span id="contador-equipo-b">0</span>/9 jugadores</p>
+
+            <ul id="lista-equipo-b">
+
+            </ul>
+        </div>
+
+    </div>
+
+<br>
+
+<div class="compartir-container">
+    <button class="btn-gold" onclick="compartirEquipos()">
+        Compartir Equipos por WhatsApp
+    </button>
+</div>
+
+<div id="admin-acciones" class="admin-panel" style="display:none;">
+
+    <h3>⚙️ Panel Administrador</h3>
+
+   	<div class="resumen-pichanga">
+    <p>✅ Confirmados: <span id="contador-confirmados">0</span></p>
+    <p>⏳ Pendientes: <span id="contador-pendientes">0</span></p>
+    <p>🎟️ Cupos libres: <span id="contador-libres">18</span></p>
+</div>
+
+    <div class="admin-form">
+
+        <input type="text" id="input-modalidad" placeholder="Modalidad: Fulbito 9 vs 9">
+
+        <input type="text" id="input-cancha" placeholder="Cancha: Cancha La 12">
+
+        <input type="text" id="input-hora" placeholder="Hora: Jueves 10:30 PM">
+
+        <input type="text" id="input-precio" placeholder="Precio: S/18 por jugador">
+
+        <button class="btn-gold" onclick="actualizarPartido()">
+            Guardar Cambios
+        </button>
+
+        <button class="btn-admin" onclick="reiniciarPichanga()">
+            Reiniciar Pichanga
+        </button>
+
+    </div>
+
+</div>
+
+
+</section>
+
+    <section class="section">
+        <h2>🔥 ¿Por qué Liga Dorada?</h2>
+
+        <div class="features">
+
+            <div class="feature-card">
+                <h3>🏆 Historial Real</h3>
+                <p>
+                    Tus partidos, victorias y logros
+                    quedan registrados para siempre.
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <h3>📈 Sistema de Niveles</h3>
+                <p>
+                    Sube de Bronce a Diamante y demuestra
+                    quién domina la cancha.
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <h3>🎁 Premios Mensuales</h3>
+                <p>
+                    Compite por balones, camisetas y
+                    pichangas gratuitas.
+                </p>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>🥇 Ranking Dorado</h2>
+
+        <div class="card">
+
+            <h3>Top Jugadores</h3>
+
+            <ol>
+                <li>Juan Pérez - 120 pts</li>
+                <li>Carlos Díaz - 115 pts</li>
+                <li>Luis Torres - 98 pts</li>
+            </ol>
+
+        </div>
+    </section>
+
+   <footer>
+    <p>© 2026 Liga Dorada</p>
+    <p>La comunidad del fútbol amateur</p>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="firebase-config.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>

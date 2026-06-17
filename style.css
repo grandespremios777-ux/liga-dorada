@@ -1,0 +1,427 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, Helvetica, sans-serif;
+}
+
+body{
+    background:#0B1020;
+    color:white;
+}
+
+.hero{
+    height:100vh;
+    background:
+    linear-gradient(
+        rgba(0,0,0,0.65),
+        rgba(0,0,0,0.75)
+    ),
+    url('https://images.unsplash.com/photo-1517466787929-bc90951d0974');
+    
+    background-size:cover;
+    background-position:center;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+}
+
+.overlay{
+    max-width:800px;
+    padding:20px;
+}
+
+.hero h1{
+    font-size:5rem;
+    color:#D4AF37;
+    margin-bottom:20px;
+}
+
+.slogan{
+    font-size:2rem;
+    margin-bottom:10px;
+}
+
+.subtitle{
+    font-size:1.2rem;
+    opacity:.85;
+    margin-bottom:30px;
+}
+
+.btn-gold{
+    background:#D4AF37;
+    color:black;
+    padding:15px 35px;
+    border:none;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:bold;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.btn-gold:hover{
+    transform:scale(1.05);
+}
+
+.section{
+    padding:80px 20px;
+    max-width:1200px;
+    margin:auto;
+}
+
+.section h2{
+    text-align:center;
+    margin-bottom:40px;
+    color:#D4AF37;
+}
+
+.card{
+    background:#151c33;
+    border:1px solid rgba(212,175,55,.3);
+    border-radius:15px;
+    padding:30px;
+    max-width:500px;
+    margin:auto;
+    text-align:center;
+}
+
+.card p{
+    margin:12px 0;
+}
+
+.features{
+    display:flex;
+    gap:20px;
+    justify-content:center;
+    flex-wrap:wrap;
+}
+
+.feature-card{
+    background:#151c33;
+    width:300px;
+    padding:25px;
+    border-radius:15px;
+    border:1px solid rgba(212,175,55,.3);
+}
+
+.feature-card h3{
+    margin-bottom:15px;
+    color:#D4AF37;
+}
+
+ol{
+    text-align:left;
+    margin-top:20px;
+    padding-left:20px;
+}
+
+li{
+    margin-bottom:10px;
+}
+
+footer{
+    text-align:center;
+    padding:30px;
+    border-top:1px solid rgba(255,255,255,.1);
+}
+
+#lista-inscritos {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#lista-inscritos li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 500;
+}
+
+.btn-confirmar {
+    background: #22c55e;
+    color: white;
+    border: none;
+    padding: 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.btn-eliminar {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.btn-confirmar:hover {
+    opacity: 0.85;
+}
+
+.btn-eliminar:hover {
+    opacity: 0.85;
+}
+
+.versus-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.equipo-card {
+    background: #161D31;
+    border: 1px solid #2A344F;
+    border-radius: 16px;
+    padding: 24px;
+    width: 420px;
+    min-height: 260px;
+}
+
+.equipo-card h3 {
+    color: #D4AF37;
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.equipo-card p {
+    text-align: center;
+    color: white;
+    opacity: 0.8;
+    margin-bottom: 18px;
+}
+
+.vs {
+    color: #D4AF37;
+    font-size: 32px;
+    font-weight: bold;
+    margin-top: 120px;
+}
+
+#lista-equipo-a,
+#lista-equipo-b {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#lista-equipo-a li,
+#lista-equipo-b li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 500;
+}
+
+
+.btn-mover {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.btn-mover:hover {
+    opacity: 0.85;
+}
+
+.compartir-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.admin-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
+}
+
+.btn-admin {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-admin:hover {
+    opacity: 0.85;
+}
+
+.resumen-pichanga {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 14px 0;
+}
+
+.resumen-pichanga p {
+    margin: 6px 0;
+    font-size: 15px;
+}
+
+.btn-admin-login {
+    background: transparent;
+    color: #D4AF37;
+    border: 1px solid #D4AF37;
+    padding: 10px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-admin-login:hover {
+    background: rgba(212, 175, 55, 0.12);
+}
+
+.admin-panel {
+    max-width: 500px;
+    margin: 30px auto;
+    background: #161D31;
+    border: 1px solid #2A344F;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+}
+
+.admin-panel h3 {
+    color: #D4AF37;
+    margin-bottom: 18px;
+}
+
+.admin-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-form input {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #2A344F;
+    background: #0A0F1F;
+    color: white;
+}
+
+/* Orden visual de jugadores y botones admin */
+#lista-equipo-a li,
+#lista-equipo-b li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+#lista-equipo-a li button,
+#lista-equipo-b li button {
+    margin: 3px;
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 8px;
+    min-width: auto;
+}
+
+.btn-confirmar {
+    background-color: #22c55e;
+    color: white;
+    border: none;
+}
+
+.btn-mover {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+}
+
+.btn-eliminar {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+}
+
+/* Orden del formulario de reserva */
+#formulario {
+    text-align: center;
+}
+
+#formulario input,
+#formulario select {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    margin: 12px auto;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    box-sizing: border-box;
+    font-size: 15px;
+}
+
+#formulario label {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    margin: 12px auto 4px auto;
+    text-align: left;
+    font-weight: bold;
+}
+
+.opcion-perfil {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.opcion-perfil label {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    max-width: none;
+    text-align: center;
+}
+
+.opcion-perfil input {
+    width: auto;
+    margin: 0;
+}
+
+.texto-ayuda-perfil {
+    max-width: 380px;
+    margin: 10px auto 20px auto;
+    font-size: 14px;
+    opacity: 0.9;
+    line-height: 1.4;
+}
