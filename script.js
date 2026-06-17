@@ -1,5 +1,7 @@
 let adminActivo = false;
 
+const CLAVE_ADMIN = "LigaDorada2026";
+
 let partidoId = "pichanga_actual";
 
 let jugadores = JSON.parse(localStorage.getItem("jugadores")) || [];
@@ -621,7 +623,7 @@ function activarAdmin() {
 
     let clave = prompt("Ingresa la clave de administrador");
 
-    if (clave === "liga123") {
+    if (clave === CLAVE_ADMIN) {
 
         adminActivo = true;
 
