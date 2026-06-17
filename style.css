@@ -462,3 +462,44 @@ footer{
         padding: 0;
     }
 }
+
+/* Responsive real para equipos en celular */
+@media (max-width: 768px) {
+
+    .versus-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 25px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .equipo-card {
+        width: 90%;
+        max-width: 360px;
+        margin: 0 auto;
+        box-sizing: border-box;
+    }
+
+    .vs {
+        margin: 5px 0;
+        font-size: 34px;
+        text-align: center;
+    }
+
+    #lista-equipo-a,
+    #lista-equipo-b {
+        width: 100%;
+        padding: 0;
+    }
+
+    #lista-equipo-a li,
+    #lista-equipo-b li {
+        width: 100%;
+        box-sizing: border-box;
+        text-align: left;
+    }
+}
