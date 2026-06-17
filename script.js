@@ -1987,3 +1987,24 @@ function validarCorreo(correo) {
     const patronCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return patronCorreo.test(correo);
 }
+
+
+let palabraSecretaAdmin = "";
+
+document.addEventListener("keydown", function(event) {
+    palabraSecretaAdmin += event.key.toLowerCase();
+
+    if (palabraSecretaAdmin.length > 10) {
+        palabraSecretaAdmin = palabraSecretaAdmin.slice(-10);
+    }
+
+    if (palabraSecretaAdmin.includes("dorada")) {
+        const botonAdmin = document.getElementById("btn-admin-login");
+
+        if (botonAdmin) {
+            botonAdmin.style.display = "inline-block";
+        }
+
+        palabraSecretaAdmin = "";
+    }
+});
