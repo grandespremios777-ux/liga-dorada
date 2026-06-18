@@ -83,104 +83,136 @@
 <section id="formulario" class="section" style="display:none;">
     <h2>⚽ Reserva tu Cupo</h2>
 
-    <div class="card">
+    <div class="card form-card-pro">
+    <div class="form-side-deco-left"></div>
+    <div class="form-side-deco-right"></div>
+    <div class="form-inner-glow"></div>
 
-        <div class="opcion-perfil">
-    <label>
-        <input type="checkbox" id="usarPerfilLigaDorada">
-        Usar mi perfil Liga Dorada
-    </label>
+    <!-- aquí sigue el resto del contenido del formulario -->
+        
 
-    <p class="texto-ayuda-perfil">
-        Si ya tienes perfil, solo usaremos tu WhatsApp para cargar tus datos.
-    </p>
+        <div class="form-top-badge">Registro de Jugador</div>
+
+        <div class="perfil-switch">
+            <input type="checkbox" id="usarPerfilLigaDorada">
+            <div class="perfil-switch-texto">
+                <label for="usarPerfilLigaDorada">Usar mi perfil Liga Dorada</label>
+                <p>Si ya tienes perfil, solo usaremos tu WhatsApp para cargar tus datos automáticamente.</p>
+            </div>
+        </div>
+
+        <p id="perfil-encontrado" class="perfil-encontrado-msg"></p>
+
+        <div class="form-grid form-grid-3">
+            <div class="input-box campo-normal" id="grupo-nombre">
+    <label for="nombre">Nombre completo</label>
+    <input type="text" id="nombre" placeholder="Ej: Eduardo Ramos">
 </div>
 
-<div id="mensajePerfilEncontrado" class="mensaje-perfil-encontrado"></div>
+            <div class="input-box campo-normal" id="grupo-edad">
+    <label for="edad">Edad</label>
+    <input type="number" id="edad" placeholder="Ej: 24">
+</div>
 
-        <input type="text" id="nombre" placeholder="Nombre completo">
-        <input type="number" id="edad" placeholder="Edad" min="12" max="80">
+            <div class="input-box campo-normal" id="grupo-distrito">
+    <label for="distrito">Distrito</label>
+    <input type="text" id="distrito" placeholder="Ej: San Martín de Porres">
+</div>
 
-<input type="text" id="distrito" placeholder="Distrito">
+        <div class="input-box campo-normal" id="grupo-correo">
+    <label for="correo">Correo electrónico</label>
+    <input type="email" id="correo" placeholder="Ej: jugador@gmail.com">
+</div>
 
-        <br><br>
+            <div class="input-box">
+                <label for="whatsapp">WhatsApp</label>
+                <input type="tel" id="whatsapp" placeholder="Ej: 944434323">
+            </div>
+        </div>
 
-        <input type="email" id="correo" placeholder="Correo electrónico">
+        <div class="form-grid form-grid-3">
+            <div class="input-box">
+                <label for="posicion">Posición</label>
+                <select id="posicion">
+                    <option value="Arquero">Arquero</option>
+                    <option value="Defensa">Defensa</option>
+                    <option value="Volante">Volante</option>
+                    <option value="Delantero">Delantero</option>
+                </select>
+            </div>
 
-        <br><br>
+            <div class="input-box" id="grupo-pie-dominante">
+                <label for="pieDominante">Pie dominante</label>
+                <select id="pieDominante">
+                    <option value="">Selecciona tu pie dominante</option>
+                    <option value="Der">Derecho</option>
+                    <option value="Izq">Izquierdo</option>
+                </select>
+            </div>
 
-        <input type="text" id="whatsapp" placeholder="WhatsApp">
+            <div class="input-box">
+                <label for="equipo">Equipo</label>
+                <select id="equipo">
+                    <option value="A">Equipo A</option>
+                    <option value="B">Equipo B</option>
+                </select>
+            </div>
+        </div>
 
-        <br><br>
+        <div class="form-footer-info">
+            Completa tus datos correctamente para que tu perfil y tus estadísticas queden registradas.
+        </div>
 
-        <select id="posicion">
-            <option>Arquero</option>
-            <option>Defensa</option>
-            <option>Volante</option>
-            <option>Delantero</option>
-        </select>
-
-        <label id="labelPieDominante" for="pieDominante">Pie dominante</label>
-
-<select id="pieDominante">
-    <option value="">Selecciona tu pie dominante</option>
-    <option value="Der">Derecho</option>
-    <option value="Izq">Izquierdo</option>
-</select>
-
-<br><br>
-
-<select id="equipo">
-    <option value="A">Equipo A</option>
-    <option value="B">Equipo B</option>
-</select>
-
-        <br><br>
-
-  <button id="btn-enviar" class="btn-gold" onclick="enviarReserva()">
-    Enviar
-</button>
+        <div class="form-actions">
+            <button id="btn-enviar" class="btn-gold btn-submit-pro" onclick="enviarReserva()">
+                Enviar inscripción
+            </button>
+        </div>
 
     </div>
 </section>
 
 <section id="inscritos" class="section">
-
     <h2>⚔️ Equipos Confirmados</h2>
 
-    <div class="versus-container">
+    <div class="versus-wrapper">
 
-        <div class="equipo-card">
-            <h3>🟡 Equipo A</h3>
-            <p><span id="contador-equipo-a">0</span>/9 jugadores</p>
-
-            <ul id="lista-equipo-a">
-
-            </ul>
+        <div class="jugador-lateral jugador-lateral-izq">
+            <div class="jugador-fondo jugador-fondo-izq"></div>
         </div>
 
-        <div class="vs">
-            VS
+        <div class="versus-container">
+
+            <div class="equipo-card">
+                <h3>🟡 Equipo A</h3>
+                <p><span id="contador-equipo-a">0</span>/9 jugadores</p>
+                <ul id="lista-equipo-a"></ul>
+            </div>
+
+            <div class="vs">VS</div>
+
+            <div class="equipo-card">
+                <h3>⚫ Equipo B</h3>
+                <p><span id="contador-equipo-b">0</span>/9 jugadores</p>
+                <ul id="lista-equipo-b"></ul>
+            </div>
+
         </div>
 
-        <div class="equipo-card">
-            <h3>⚫ Equipo B</h3>
-            <p><span id="contador-equipo-b">0</span>/9 jugadores</p>
-
-            <ul id="lista-equipo-b">
-
-            </ul>
+        <div class="jugador-lateral jugador-lateral-der">
+            <div class="jugador-fondo jugador-fondo-der"></div>
         </div>
 
     </div>
 
-<br>
+    <br>
 
-<div class="compartir-container">
-    <button class="btn-gold" onclick="compartirEquipos()">
-        Compartir Equipos por WhatsApp
-    </button>
-</div>
+    <div class="compartir-container">
+        <button class="btn-gold" onclick="compartirEquipos()">
+            Compartir Equipos por WhatsApp
+        </button>
+    </div>
+</section>
 
 <div id="admin-acciones" class="admin-panel" style="display:none;">
 
@@ -252,7 +284,7 @@
     <section class="section">
         <h2>🥇 Ranking Dorado</h2>
 
-        <div class="card">
+        <div class="perfil-consulta-wrap"></div>
 
             <h3>Top Jugadores</h3>
 
