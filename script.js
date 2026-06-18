@@ -39,8 +39,18 @@ document.addEventListener("DOMContentLoaded", function() {
 
     actualizarModoPerfil();
 });
+
 function reservarCupo() {
-    document.getElementById("formulario").style.display = "block";
+    const formulario = document.getElementById("formulario");
+
+    formulario.style.display = "block";
+
+    setTimeout(() => {
+        formulario.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }, 100);
 }
 
 async function enviarReserva() {
@@ -1932,7 +1942,6 @@ async function cargarPerfilJugadorFirebase(whatsapp) {
     }
 }
 function actualizarModoPerfil() {
-
     const checkPerfil = document.getElementById("usarPerfilLigaDorada");
 
     if (!checkPerfil) {
@@ -1941,27 +1950,21 @@ function actualizarModoPerfil() {
 
     const usarPerfil = checkPerfil.checked;
 
-    const campoNombre = document.getElementById("nombre");
-    const campoCorreo = document.getElementById("correo");
-    const campoPie = document.getElementById("pieDominante");
-    const labelPie = document.getElementById("labelPieDominante");
+    const gruposOcultar = [
+        "grupo-nombre",
+        "grupo-edad",
+        "grupo-distrito",
+        "grupo-correo",
+        "grupo-pie-dominante"
+    ];
 
-    if (campoNombre) {
-        campoNombre.style.display = usarPerfil ? "none" : "block";
-    }
+    gruposOcultar.forEach(function(idGrupo) {
+        const grupo = document.getElementById(idGrupo);
 
-    if (campoCorreo) {
-        campoCorreo.style.display = usarPerfil ? "none" : "block";
-    }
-
-    if (campoPie) {
-        campoPie.style.display = usarPerfil ? "none" : "block";
-    }
-
-    if (labelPie) {
-    labelPie.style.display = usarPerfil ? "none" : "block";
-}
-
+        if (grupo) {
+            grupo.style.display = usarPerfil ? "none" : "flex";
+        }
+    });
 }
 
 
@@ -2092,36 +2095,65 @@ async function buscarMiPerfil() {
         const inscripcionActual = jugadores.find(jugador => jugador.whatsapp === whatsapp);
 
         resultado.innerHTML = `
-            <div class="perfil-resultado-card">
+    <div class="perfil-resultado-card">
+        <div class="perfil-top">
+            <div class="perfil-avatar-grande">👤</div>
+
+            <div class="perfil-main">
                 <h3>${perfil.nombre || "Jugador Liga Dorada"}</h3>
-
-                <p><strong>Edad:</strong> ${perfil.edad || "No definida"}</p>
-                <p><strong>Distrito:</strong> ${perfil.distrito || "No definido"}</p>
-
-                <p><strong>ID jugador:</strong> ${perfil.jugadorId || perfil.whatsapp || whatsapp}</p>
-                <p><strong>WhatsApp:</strong> ${perfil.whatsapp || whatsapp}</p>
-                <p><strong>Correo:</strong> ${perfil.correo || "No registrado"}</p>
-
-                <hr>
-
-                <p><strong>Nivel:</strong> ${perfil.nivel || 1} ⭐</p>
-                <p><strong>Posición registrada:</strong> ${perfil.posicion || "No registrada"}</p>
-                <p><strong>Pie dominante:</strong> ${perfil.pieDominante || "No registrado"}</p>
-
-                <hr>
-
-<p><strong>Estado en pichanga actual:</strong> ${inscripcionActual ? inscripcionActual.estado : "No inscrito actualmente"}</p>
-<p><strong>Equipo actual:</strong> ${inscripcionActual ? inscripcionActual.equipo : "Sin equipo actual"}</p>
-<p><strong>Posición en esta pichanga:</strong> ${inscripcionActual ? inscripcionActual.posicion : "No inscrito"}</p>
-
-                <hr>
-
-                <p><strong>Partidos jugados:</strong> ${perfil.partidosJugados || 0}</p>
-                <p><strong>Goles:</strong> ${perfil.goles || 0}</p>
-                <p><strong>Puntos:</strong> ${perfil.puntos || 0}</p>
+                <p class="perfil-meta">
+                    ${perfil.edad ? perfil.edad + " años" : "Edad no definida"} · 
+                    ${perfil.distrito || "Distrito no definido"}
+                </p>
+                <p class="perfil-id">
+                    ID: ${perfil.jugadorId || perfil.whatsapp || whatsapp}
+                </p>
             </div>
-        `;
+        </div>
 
+        <div class="perfil-stats-grid">
+            <div class="stat-mini-card">
+                <span class="stat-label">Nivel</span>
+                <strong>${perfil.nivel || 1} ⭐</strong>
+            </div>
+
+            <div class="stat-mini-card">
+                <span class="stat-label">PT</span>
+                <strong>${perfil.partidosJugados || 0}</strong>
+            </div>
+
+            <div class="stat-mini-card">
+                <span class="stat-label">Goles</span>
+                <strong>${perfil.goles || 0}</strong>
+            </div>
+
+            <div class="stat-mini-card">
+                <span class="stat-label">Puntos</span>
+                <strong>${perfil.puntos || 0}</strong>
+            </div>
+        </div>
+
+        <div class="perfil-bloque">
+            <p><strong>Posición registrada:</strong> ${perfil.posicion || "No registrada"}</p>
+            <p><strong>Pie dominante:</strong> ${perfil.pieDominante || "No registrado"}</p>
+            <p><strong>WhatsApp:</strong> ${perfil.whatsapp || whatsapp}</p>
+            <p><strong>Correo:</strong> ${perfil.correo || "No registrado"}</p>
+        </div>
+
+        <div class="perfil-bloque">
+            <h4>🔥 Pichanga actual</h4>
+            <p><strong>Estado:</strong> ${
+                inscripcionActual
+                    ? (inscripcionActual.estado === "Confirmado"
+                        ? "Confirmado ✅"
+                        : inscripcionActual.estado)
+                    : "No inscrito actualmente"
+            }</p>
+            <p><strong>Equipo:</strong> ${inscripcionActual ? inscripcionActual.equipo : "Sin equipo actual"}</p>
+            <p><strong>Posición en esta pichanga:</strong> ${inscripcionActual ? inscripcionActual.posicion : "No inscrito"}</p>
+        </div>
+    </div>
+`;
     } catch (error) {
         console.error("Error buscando perfil:", error);
         resultado.innerHTML = "<p class='error'>Ocurrió un error al buscar tu perfil. Intenta nuevamente.</p>";
