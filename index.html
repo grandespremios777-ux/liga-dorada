@@ -28,17 +28,70 @@
             <h1>LIGA DORADA</h1>
             <p class="slogan">Donde los goles cuentan</p>
             <p class="subtitle">
-                Juega. Compite. Asciende.
+               Juega. Compite. Asciende.
             </p>
 
-            <a href="#partido" class="btn-gold">
-                Reservar Cupo
-   
+            <a href="#cartelera-pichangas" class="btn-gold">
+    Reservar Cupo
 </a>
 
 </div>
 </header>
 
+<section id="cartelera-pichangas" class="section">
+    <h2>📅 Próximas Pichangas</h2>
+
+    <div id="lista-pichangas" class="cartelera-grid">
+        <p>Cargando pichangas...</p>
+    </div>
+</section>
+
+<section id="detalle-pichanga" class="section" style="display:none;">
+    <h2 id="detalle-pichanga-titulo">🏆 Detalle de Pichanga</h2>
+
+    <div class="card detalle-pichanga-card">
+        <h3 id="detalle-pichanga-modalidad">Modalidad</h3>
+
+        <p>📍 <span id="detalle-pichanga-cancha">Cancha</span></p>
+        <p>🕘 <span id="detalle-pichanga-hora">Hora</span></p>
+        <p>💰 <span id="detalle-pichanga-precio">Precio</span></p>
+        <p>👥 <span id="detalle-pichanga-cupos">0/0 inscritos</span></p>
+
+        <button class="btn-gold" onclick="reservarCupo()">
+            Reservar en esta pichanga
+        </button>
+    </div>
+
+    <div class="detalle-equipos-wrapper">
+        <h2>⚔️ Equipos Confirmados</h2>
+
+        <div class="versus-wrapper">
+            <div class="jugador-lateral jugador-lateral-izq">
+                <div class="jugador-fondo jugador-fondo-izq"></div>
+            </div>
+
+            <div class="versus-container">
+                <div class="equipo-card">
+                    <h3>🟡 Equipo A</h3>
+                    <p><span id="detalle-contador-equipo-a">0</span> jugadores</p>
+                    <ul id="detalle-lista-equipo-a"></ul>
+                </div>
+
+                <div class="vs">VS</div>
+
+                <div class="equipo-card">
+                    <h3>⚫ Equipo B</h3>
+                    <p><span id="detalle-contador-equipo-b">0</span> jugadores</p>
+                    <ul id="detalle-lista-equipo-b"></ul>
+                </div>
+            </div>
+
+            <div class="jugador-lateral jugador-lateral-der">
+                <div class="jugador-fondo jugador-fondo-der"></div>
+            </div>
+        </div>
+    </div>
+</section>
 
    <section id="partido" class="section">
     <h2>🏆 Próxima Pichanga</h2>
@@ -57,19 +110,22 @@
 
 
 
-<button class="btn-gold" onclick="reservarCupo()">
-    Reservar Ahora
+<button class="btn-gold" onclick="irACarteleraPichangas()">
+    Reservar Cupo
 </button>
 
 <br><br>
-
-<button id="btn-admin-login" class="btn-admin-login" onclick="activarAdmin()">
-    Acceso interno
-</button>
 
 <br><br>
 
     </div>
+</section>
+
+<section id="admin-acceso" class="section">
+    <button id="btn-admin-login" class="btn-admin-login" onclick="activarAdmin()">
+        Acceso interno
+    </button>
+
 </section>
 
 <section id="mi-perfil" class="section">
@@ -233,6 +289,13 @@
 
     <h3>⚙️ Panel Administrador</h3>
 
+    <div class="admin-selector-pichanga">
+    <label for="admin-selector-pichanga">Administrar pichanga</label>
+    <select id="admin-selector-pichanga" onchange="seleccionarPichangaAdmin()">
+        <option value="">Selecciona una pichanga</option>
+    </select>
+</div>
+
    	<div class="resumen-pichanga">
     <p>✅ Confirmados: <span id="contador-confirmados">0</span></p>
     <p>⏳ Pendientes: <span id="contador-pendientes">0</span></p>
@@ -240,6 +303,8 @@
 </div>
 
     <div class="admin-form">
+
+        <input type="text" id="input-nombre-pichanga" placeholder="Nombre de pichanga">
 
         <input type="text" id="input-modalidad" placeholder="Modalidad: Fulbito 9 vs 9">
 
@@ -249,23 +314,43 @@
 
         <input type="text" id="input-precio" placeholder="Precio: S/18 por jugador">
 
-        <button class="btn-gold" onclick="actualizarPartido()">
-            Guardar Cambios
-        </button>
+        <input type="number" id="input-cupos-pichanga" placeholder="Cupos máximos">
 
-        <button class="btn-admin" onclick="reiniciarPichanga()">
-            Reiniciar Pichanga
-        </button>
+<select id="input-estado-pichanga">
+    <option value="Disponible">Disponible</option>
+    <option value="Próximamente">Próximamente</option>
+    <option value="Cerrada">Cerrada</option>
+</select>
+
+        <button class="btn-gold" onclick="actualizarPichangaAdmin()">
+    Guardar Cambios
+</button>
+
+<button class="btn-gold" onclick="crearPichangaAdmin()">
+    Crear Nueva Pichanga
+</button>
+
+        <button class="btn-admin" onclick="eliminarPichangaAdmin()">
+    Eliminar Pichanga
+</button>
 
     </div>
+
+    <div id="admin-jugadores-pichanga" class="admin-jugadores-pichanga">
+    <h3>👥 Jugadores de esta pichanga</h3>
+
+    <div id="admin-lista-jugadores-pichanga">
+        <p>Selecciona una pichanga para ver sus jugadores.</p>
+    </div>
+</div>
 
 </div>
 
 
 </section>
 
-    <section class="section">
-        <h2>🔥 ¿Por qué Liga Dorada?</h2>
+    <section id="beneficios" class="section">
+    <h2>🔥 ¿Por qué Liga Dorada?</h2>
 
         <div class="features">
 
@@ -296,8 +381,8 @@
         </div>
     </section>
 
-    <section class="section">
-        <h2>🥇 Ranking Dorado</h2>
+    <section id="ranking" class="section">
+    <h2>🥇 Ranking Dorado</h2>
 
         <div class="perfil-consulta-wrap"></div>
 
