@@ -3283,6 +3283,7 @@ async function refrescarAdminJugadores() {
 
     await cargarJugadoresFirebase();
     await cargarPichangasFirebase();
+    await cargarRankingDorado();
 
     mostrarJugadoresAdminPichanga();
     mostrarEquiposDetallePichanga();
@@ -3547,4 +3548,327 @@ async function cambiarGolesJugadorAdmin(firebaseId, golesActuales) {
         console.error("Error cambiando goles:", error);
         alert("Error al cambiar goles. Revisa la consola.");
     }
+}
+
+async function reiniciarPuntosMensualesAdmin() {
+    const confirmacionInicial = confirm(
+        "⚠️ CIERRE MENSUAL DE PUNTOS\n\n" +
+        "Se guardará una copia del ranking actual y los puntos de todos los jugadores volverán a 0.\n\n" +
+        "Los goles, partidos y niveles no cambiarán.\n\n" +
+        "¿Deseas continuar?"
+    );
+
+    if (!confirmacionInicial) {
+        return;
+    }
+
+    const palabraSeguridad = prompt(
+        "Para confirmar el reinicio mensual escribe exactamente:\n\nREINICIAR"
+    );
+
+    if (palabraSeguridad !== "REINICIAR") {
+        alert("Reinicio cancelado. No se modificó ningún punto.");
+        return;
+    }
+
+    try {
+        const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
+        alert("Guardando ranking mensual y reiniciando puntos. Espera unos segundos...");
+
+        // 1. Obtener todos los perfiles permanentes
+        const respuestaPerfiles = await fetch(`${baseUrl}/jugadoresPerfil`);
+        const datosPerfiles = await respuestaPerfiles.json();
+
+        if (!respuestaPerfiles.ok) {
+            throw new Error("No se pudieron obtener los perfiles de jugadores.");
+        }
+
+        const perfiles = (datosPerfiles.documents || []).map(function(documento) {
+            const campos = documento.fields || {};
+
+            return {
+                idDocumento: documento.name.split("/").pop(),
+                nombre: campos.nombre ? campos.nombre.stringValue : "Jugador sin nombre",
+                whatsapp: campos.whatsapp ? campos.whatsapp.stringValue : "",
+                nivel: campos.nivel
+                    ? Number(campos.nivel.integerValue || campos.nivel.stringValue)
+                    : 1,
+                puntos: campos.puntos
+                    ? Number(campos.puntos.integerValue || campos.puntos.stringValue)
+                    : 0,
+                goles: campos.goles
+                    ? Number(campos.goles.integerValue || campos.goles.stringValue)
+                    : 0,
+                partidosJugados: campos.partidosJugados
+                    ? Number(campos.partidosJugados.integerValue || campos.partidosJugados.stringValue)
+                    : 0
+            };
+        });
+
+        // 2. Ordenar el ranking antes de reiniciar
+        perfiles.sort(function(a, b) {
+            return b.puntos - a.puntos;
+        });
+
+        const fechaActual = new Date();
+        const mesCerrado = fechaActual.toLocaleDateString("es-PE", {
+            month: "long",
+            year: "numeric"
+        });
+
+        const idHistorial = `ranking_${fechaActual.getFullYear()}_${String(
+            fechaActual.getMonth() + 1
+        ).padStart(2, "0")}_${Date.now()}`;
+
+        // 3. Guardar una copia del ranking mensual
+        const rankingParaGuardar = perfiles.map(function(jugador, indice) {
+            return {
+                mapValue: {
+                    fields: {
+                        puesto: {
+                            integerValue: indice + 1
+                        },
+                        nombre: {
+                            stringValue: jugador.nombre
+                        },
+                        whatsapp: {
+                            stringValue: jugador.whatsapp
+                        },
+                        nivel: {
+                            integerValue: jugador.nivel
+                        },
+                        puntos: {
+                            integerValue: jugador.puntos
+                        },
+                        goles: {
+                            integerValue: jugador.goles
+                        },
+                        partidosJugados: {
+                            integerValue: jugador.partidosJugados
+                        }
+                    }
+                }
+            };
+        });
+
+        const historialMensual = {
+            fields: {
+                mes: {
+                    stringValue: mesCerrado
+                },
+                cerradoEn: {
+                    timestampValue: fechaActual.toISOString()
+                },
+                totalJugadores: {
+                    integerValue: perfiles.length
+                },
+                ranking: {
+                    arrayValue: {
+                        values: rankingParaGuardar
+                    }
+                }
+            }
+        };
+
+        const respuestaHistorial = await fetch(
+            `${baseUrl}/historialRankingsMensuales/${idHistorial}`,
+            {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(historialMensual)
+            }
+        );
+
+        if (!respuestaHistorial.ok) {
+            throw new Error("No se pudo guardar el historial del ranking mensual.");
+        }
+
+        // 4. Reiniciar puntos de perfiles permanentes
+        for (const jugador of perfiles) {
+            await fetch(
+                `${baseUrl}/jugadoresPerfil/${encodeURIComponent(jugador.idDocumento)}?updateMask.fieldPaths=puntos`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        fields: {
+                            puntos: {
+                                integerValue: 0
+                            }
+                        }
+                    })
+                }
+            );
+        }
+
+        // 5. Obtener y reiniciar puntos de jugadores inscritos
+        const respuestaInscritos = await fetch(`${baseUrl}/inscritos`);
+        const datosInscritos = await respuestaInscritos.json();
+
+        if (!respuestaInscritos.ok) {
+            throw new Error("No se pudieron obtener los jugadores inscritos.");
+        }
+
+        const inscritos = datosInscritos.documents || [];
+
+        for (const documento of inscritos) {
+            const idInscrito = documento.name.split("/").pop();
+
+            await fetch(
+                `${baseUrl}/inscritos/${encodeURIComponent(idInscrito)}?updateMask.fieldPaths=puntos`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        fields: {
+                            puntos: {
+                                integerValue: 0
+                            }
+                        }
+                    })
+                }
+            );
+        }
+
+        await cargarJugadoresFirebase();
+        await cargarPichangasFirebase();
+        await cargarRankingDorado();
+
+        alert(
+            `✅ Cierre mensual completado.\n\n` +
+            `Se guardó el ranking de ${mesCerrado}.\n` +
+            `Jugadores reiniciados: ${perfiles.length}.\n\n` +
+            `El nuevo Ranking Dorado comienza desde 0 puntos.`
+        );
+
+    } catch (error) {
+        console.error("Error al reiniciar puntos mensuales:", error);
+
+        alert(
+            "❌ Ocurrió un error durante el reinicio mensual.\n\n" +
+            "No vuelvas a presionar el botón todavía. Revisa la consola para ver el detalle."
+        );
+    }
+}
+
+async function cargarRankingDorado() {
+    const listaRanking = document.getElementById("ranking-lista");
+
+    if (!listaRanking) {
+        return;
+    }
+
+    listaRanking.innerHTML = "<li>Cargando ranking...</li>";
+
+    try {
+        const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
+        const respuesta = await fetch(`${baseUrl}/jugadoresPerfil`);
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudieron cargar los perfiles para el ranking.");
+        }
+
+        const jugadoresRanking = (datos.documents || []).map(function(documento) {
+            const campos = documento.fields || {};
+
+            return {
+                nombre: campos.nombre
+                    ? campos.nombre.stringValue
+                    : "Jugador Liga Dorada",
+
+                whatsapp: campos.whatsapp
+                    ? campos.whatsapp.stringValue
+                    : "",
+
+                nivel: campos.nivel
+                    ? Number(campos.nivel.integerValue || campos.nivel.stringValue)
+                    : 1,
+
+                puntos: campos.puntos
+                    ? Number(campos.puntos.integerValue || campos.puntos.stringValue)
+                    : 0
+            };
+        });
+
+        // Solo jugadores que ya consiguieron puntos este mes
+        const jugadoresConPuntos = jugadoresRanking.filter(function(jugador) {
+            return jugador.puntos > 0;
+        });
+
+        // Mayor cantidad de puntos primero
+        jugadoresConPuntos.sort(function(a, b) {
+            return b.puntos - a.puntos;
+        });
+
+        // Máximo Top 5
+        const topJugadores = jugadoresConPuntos.slice(0, 5);
+
+        listaRanking.innerHTML = "";
+
+        if (topJugadores.length === 0) {
+            listaRanking.innerHTML =
+                "<li>Aún no hay puntos registrados este mes.</li>";
+            return;
+        }
+
+        topJugadores.forEach(function(jugador, indice) {
+    const puesto = indice + 1;
+
+    const item = document.createElement("div");
+    item.className = `ranking-item ranking-top-${puesto}`;
+
+    const izquierda = document.createElement("div");
+    izquierda.className = "ranking-left";
+
+    const posicion = document.createElement("div");
+    posicion.className = "ranking-posicion";
+    posicion.textContent = puesto;
+
+    const nombre = document.createElement("div");
+    nombre.className = "ranking-nombre";
+    nombre.textContent = `${jugador.nombre || "Jugador Liga Dorada"} - ${jugador.puntos} pts`;
+
+    izquierda.appendChild(posicion);
+    izquierda.appendChild(nombre);
+
+    const emoji = document.createElement("div");
+    emoji.className = "ranking-emoji";
+
+    if (puesto === 1) {
+        emoji.textContent = "👑";
+    } else if (puesto === 2) {
+        emoji.textContent = "🔥";
+    } else if (puesto === 3) {
+        emoji.textContent = "⚽";
+    } else {
+        emoji.textContent = "";
+    }
+
+    item.appendChild(izquierda);
+    item.appendChild(emoji);
+
+    listaRanking.appendChild(item);
+});
+
+    } catch (error) {
+        console.error("Error al cargar Ranking Dorado:", error);
+
+        listaRanking.innerHTML =
+            "<li>No se pudo cargar el ranking. Intenta recargar la página.</li>";
+    }
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", cargarRankingDorado);
+} else {
+    cargarRankingDorado();
 }

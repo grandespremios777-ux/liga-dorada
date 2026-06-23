@@ -3529,3 +3529,582 @@ footer p {
         grid-template-columns: 1fr;
     }
 }
+
+/* Botón de cierre mensual de puntos */
+.btn-reiniciar-puntos {
+    background: rgba(245, 197, 66, 0.14) !important;
+    color: #ffe28b !important;
+    border: 1px solid rgba(245, 197, 66, 0.40) !important;
+}
+
+.btn-reiniciar-puntos:hover {
+    background: rgba(245, 197, 66, 0.24) !important;
+    box-shadow: 0 0 18px rgba(245, 197, 66, 0.16);
+}
+
+
+/* ===== RANKING DORADO PREMIUM ===== */
+
+#ranking-lista {
+    list-style: none;
+    padding: 0;
+    margin: 30px 0 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ranking-jugador {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1.8fr) auto 54px;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 22px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, rgba(18, 36, 102, 0.96), rgba(25, 36, 84, 0.96));
+    border: 1px solid rgba(218, 178, 53, 0.35);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ranking-jugador:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+}
+
+.ranking-puesto-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ranking-puesto {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ffe67a, #d4a928);
+    color: #06133a;
+    font-size: 1.25rem;
+    font-weight: 900;
+    box-shadow: 0 4px 14px rgba(212, 169, 40, 0.35);
+}
+
+.ranking-puesto-texto {
+    color: #d8defd;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.ranking-datos-jugador {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ranking-datos-jugador strong {
+    font-size: 1.9rem;
+    line-height: 1.05;
+    color: #ffffff;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ranking-nivel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffd966;
+    background: rgba(255, 217, 102, 0.08);
+    border: 1px solid rgba(255, 217, 102, 0.22);
+    padding: 6px 12px;
+    border-radius: 999px;
+    width: fit-content;
+}
+
+.ranking-puntos-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.ranking-puntos {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+}
+
+.ranking-puntos-label {
+    font-size: 0.8rem;
+    color: #c9d3ff;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+}
+
+.ranking-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.18);
+    font-size: 1.2rem;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.ranking-puesto-1 {
+    background: linear-gradient(135deg, rgba(34, 49, 120, 0.98), rgba(29, 44, 102, 0.98));
+    border-color: rgba(255, 215, 0, 0.55);
+    box-shadow: 0 14px 30px rgba(212, 169, 40, 0.18);
+}
+
+.ranking-puesto-2 {
+    border-color: rgba(255, 193, 7, 0.35);
+}
+
+.ranking-puesto-3 {
+    border-color: rgba(83, 141, 255, 0.28);
+}
+
+@media (max-width: 900px) {
+    .ranking-jugador {
+        grid-template-columns: 90px 1fr;
+        gap: 14px;
+    }
+
+    .ranking-puntos-box {
+        align-items: flex-start;
+    }
+
+    .ranking-badge {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .ranking-jugador {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .ranking-puesto-box {
+        justify-content: flex-start;
+    }
+
+    .ranking-datos-jugador strong {
+        font-size: 1.35rem;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+    }
+
+    .ranking-puntos {
+        font-size: 1.5rem;
+    }
+}
+
+.ranking-section {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.ranking-section h2 {
+    font-size: 3rem;
+    color: #f4c542;
+    font-weight: 800;
+    margin-bottom: 25px;
+    text-shadow: 0 0 18px rgba(244, 197, 66, 0.18);
+}
+
+.ranking-subtitulo {
+    font-size: 2.1rem;
+    color: #ffffff;
+    font-weight: 800;
+    margin-bottom: 28px;
+}
+
+.ranking-box {
+    max-width: 900px;
+    margin: 0 auto;
+    background: linear-gradient(180deg, #07185d 0%, #031247 100%);
+    border: 1px solid rgba(244, 197, 66, 0.45);
+    border-radius: 34px;
+    padding: 34px 32px;
+    box-shadow: 0 0 28px rgba(0, 0, 0, 0.35);
+}
+
+#ranking-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.ranking-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(90deg, rgba(42, 58, 128, 0.96), rgba(29, 42, 101, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 26px;
+    padding: 18px 24px;
+    min-height: 82px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.ranking-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+}
+
+.ranking-posicion {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #f6d75a 0%, #d8a91f 100%);
+    color: #08143c;
+    font-weight: 900;
+    font-size: 1.45rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px rgba(244, 197, 66, 0.28);
+    flex-shrink: 0;
+}
+
+.ranking-nombre {
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 800;
+    text-align: left;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+.ranking-puntos {
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 800;
+    white-space: nowrap;
+    margin-left: 16px;
+}
+
+.ranking-emoji {
+    font-size: 1.5rem;
+    margin-left: 18px;
+    flex-shrink: 0;
+}
+
+.ranking-vacio {
+    color: #ffffff;
+    opacity: 0.8;
+    font-size: 1rem;
+    padding: 18px 10px;
+}
+
+@media (max-width: 768px) {
+    .ranking-section h2 {
+        font-size: 2.2rem;
+    }
+
+    .ranking-subtitulo {
+        font-size: 1.6rem;
+    }
+
+    .ranking-box {
+        padding: 20px 16px;
+        border-radius: 24px;
+    }
+
+    .ranking-item {
+        padding: 14px 16px;
+        min-height: 72px;
+        border-radius: 20px;
+    }
+
+    .ranking-left {
+        gap: 12px;
+    }
+
+    .ranking-posicion {
+        width: 38px;
+        height: 38px;
+        font-size: 1.15rem;
+    }
+
+    .ranking-nombre,
+    .ranking-puntos {
+        font-size: 1rem;
+    }
+
+    .ranking-emoji {
+        font-size: 1.25rem;
+        margin-left: 10px;
+    }
+}
+
+
+/* Ranking Dorado — colores especiales por puesto */
+
+.ranking-top-1 {
+    background: linear-gradient(90deg, #30458d 0%, #273c7e 55%, #1d2f68 100%) !important;
+    border: 1px solid rgba(255, 216, 86, 0.75) !important;
+    box-shadow:
+        0 0 20px rgba(255, 208, 65, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.ranking-top-2 {
+    background: linear-gradient(90deg, #263d83 0%, #203474 55%, #192b61 100%) !important;
+    border: 1px solid rgba(198, 210, 235, 0.32) !important;
+    box-shadow:
+        0 0 14px rgba(150, 180, 230, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+.ranking-top-3 {
+    background: linear-gradient(90deg, #20356f 0%, #1b2e61 100%) !important;
+    border-color: rgba(96, 153, 255, 0.24) !important;
+}
+
+.ranking-top-1 .ranking-posicion {
+    transform: scale(1.08);
+    box-shadow: 0 0 18px rgba(255, 218, 85, 0.45) !important;
+}
+
+.ranking-top-2 .ranking-posicion {
+    box-shadow: 0 0 13px rgba(217, 225, 255, 0.22) !important;
+}
+
+.ranking-emoji:empty {
+    display: none;
+}
+
+/* =========================================
+   RANKING DORADO — ESTILO ÉLITE PREMIUM
+   Solo visual. No modifica JavaScript.
+========================================= */
+
+#ranking {
+    padding-top: 55px;
+    padding-bottom: 70px;
+}
+
+#ranking .ranking-box {
+    max-width: 860px;
+    padding: 22px;
+    border-radius: 30px;
+    background:
+        linear-gradient(180deg, rgba(13, 30, 96, 0.98), rgba(5, 18, 62, 0.98));
+    border: 1px solid rgba(228, 184, 53, 0.48);
+    box-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+#ranking-lista {
+    gap: 13px !important;
+    margin: 0 !important;
+}
+
+.ranking-item {
+    min-height: 72px !important;
+    padding: 14px 20px !important;
+    border-radius: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    background:
+        linear-gradient(100deg, rgba(29, 50, 123, 0.98), rgba(21, 39, 98, 0.98)) !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow:
+        0 8px 18px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+
+    transition:
+        transform 0.22s ease,
+        border-color 0.22s ease,
+        box-shadow 0.22s ease !important;
+}
+
+.ranking-item:hover {
+    transform: translateY(-2px) !important;
+    border-color: rgba(244, 201, 66, 0.45) !important;
+    box-shadow:
+        0 14px 26px rgba(0, 0, 0, 0.24),
+        0 0 18px rgba(228, 184, 53, 0.08) !important;
+}
+
+.ranking-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 17px !important;
+    min-width: 0 !important;
+}
+
+.ranking-posicion {
+    width: 45px !important;
+    height: 45px !important;
+    min-width: 45px !important;
+    border-radius: 14px !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    background:
+        linear-gradient(145deg, #ffe882 0%, #e2b52d 55%, #bf8612 100%) !important;
+
+    color: #071333 !important;
+    font-size: 1.15rem !important;
+    font-weight: 900 !important;
+
+    box-shadow:
+        0 5px 12px rgba(235, 187, 41, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+
+.ranking-nombre {
+    color: #ffffff !important;
+    font-size: 1.22rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.1px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.ranking-emoji {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 12px !important;
+    font-size: 1.2rem !important;
+
+    background: rgba(255, 255, 255, 0.045) !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+/* --- Top 1: CAMPEÓN DORADO --- */
+.ranking-top-1 {
+    background:
+        linear-gradient(90deg,
+            rgba(255, 215, 70, 0.34) 0%,
+            rgba(214, 160, 24, 0.22) 22%,
+            rgba(35, 57, 132, 0.96) 68%,
+            rgba(24, 42, 102, 0.98) 100%) !important;
+
+    border: 1px solid rgba(255, 220, 100, 0.95) !important;
+
+    box-shadow:
+        0 14px 30px rgba(0, 0, 0, 0.24),
+        0 0 26px rgba(255, 210, 60, 0.20),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+.ranking-top-1 .ranking-posicion {
+    background:
+        linear-gradient(145deg,
+            #fff7bf 0%,
+            #ffd84d 38%,
+            #f0b91f 72%,
+            #c88709 100%) !important;
+
+    color: #081735 !important;
+
+    box-shadow:
+        0 0 20px rgba(255, 214, 72, 0.55),
+        0 6px 16px rgba(235, 185, 36, 0.28),
+        inset 0 1px 0 rgba(255,255,255,0.55) !important;
+}
+
+.ranking-top-1 .ranking-emoji {
+    background: rgba(255, 215, 70, 0.14) !important;
+    border-color: rgba(255, 220, 100, 0.34) !important;
+}
+
+/* --- Segundo lugar --- */
+
+.ranking-top-2 {
+
+    background:
+
+        linear-gradient(105deg, #273553 0%, #536982 28%, #243c82 70%, #182a5c 100%) !important;
+
+
+
+    border: 1px solid rgba(207, 223, 242, 0.38) !important;
+
+
+
+    box-shadow:
+
+        0 10px 22px rgba(0, 0, 0, 0.19),
+
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+
+}
+
+
+
+.ranking-top-2 .ranking-posicion {
+
+/* --- Top 3: BRONCE REAL --- */
+.ranking-top-3 {
+    background:
+        linear-gradient(90deg,
+            rgba(176, 96, 34, 0.34) 0%,
+            rgba(120, 63, 18, 0.24) 22%,
+            rgba(39, 64, 141, 0.96) 68%,
+            rgba(26, 45, 108, 0.98) 100%) !important;
+
+    border: 1px solid rgba(194, 122, 66, 0.65) !important;
+
+    box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.20),
+        0 0 16px rgba(189, 117, 58, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+.ranking-top-3 .ranking-posicion {
+    background:
+        linear-gradient(145deg,
+            #f2c18d 0%,
+            #d38a43 45%,
+            #ab5f23 72%,
+            #7b3f14 100%) !important;
+
+    color: #0a1633 !important;
+
+    box-shadow:
+        0 0 14px rgba(201, 123, 58, 0.24),
+        0 5px 12px rgba(156, 87, 34, 0.20),
+        inset 0 1px 0 rgba(255,255,255,0.32) !important;
+}
+
+.ranking-top-3 .ranking-emoji {
+    background: rgba(194, 122, 66, 0.10) !important;
+    border-color: rgba(194, 122, 66, 0.18) !important;
+}

@@ -334,6 +334,10 @@
     Eliminar Pichanga
 </button>
 
+<button class="btn-admin btn-reiniciar-puntos" onclick="reiniciarPuntosMensualesAdmin()">
+    🔄 Reiniciar puntos mensuales
+</button>
+
     </div>
 
     <div id="admin-jugadores-pichanga" class="admin-jugadores-pichanga">
@@ -381,21 +385,16 @@
         </div>
     </section>
 
-    <section id="ranking" class="section">
+    <section id="ranking" class="section ranking-section">
     <h2>🥇 Ranking Dorado</h2>
+    <h3 class="ranking-subtitulo">🏆 Top Jugadores</h3>
 
-        <div class="perfil-consulta-wrap"></div>
-
-            <h3>Top Jugadores</h3>
-
-            <ol>
-                <li>Juan Pérez - 120 pts</li>
-                <li>Carlos Díaz - 115 pts</li>
-                <li>Luis Torres - 98 pts</li>
-            </ol>
-
+    <div class="ranking-box">
+        <div id="ranking-lista">
+            <p>Cargando ranking...</p>
         </div>
-    </section>
+    </div>
+</section>
 
    <footer>
     <p>© 2026 Liga Dorada</p>
