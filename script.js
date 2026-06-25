@@ -3944,3 +3944,61 @@ if (document.readyState === "loading") {
 } else {
     configurarAccesoAdminOculto();
 }
+
+async function compartirEquipos() {
+    const idPichanga = localStorage.getItem("pichangaSeleccionadaId") || partidoId;
+
+    const pichangaActual = pichangasCargadas.find(function(pichanga) {
+        return pichanga.id === idPichanga;
+    });
+
+    const equipoA = jugadores.filter(function(jugador) {
+        const equipo = String(jugador.equipo || "").trim().toUpperCase();
+
+        return equipo === "A" || equipo === "EQUIPO A";
+    });
+
+    const equipoB = jugadores.filter(function(jugador) {
+        const equipo = String(jugador.equipo || "").trim().toUpperCase();
+
+        return equipo === "B" || equipo === "EQUIPO B";
+    });
+
+    const nombrePichanga =
+        (pichangaActual && pichangaActual.nombre) ||
+        localStorage.getItem("pichangaSeleccionadaNombre") ||
+        "Pichanga Liga Dorada";
+
+    const cancha =
+        document.getElementById("detalle-pichanga-cancha")?.textContent ||
+        "Cancha por confirmar";
+
+    const hora =
+        document.getElementById("detalle-pichanga-hora")?.textContent ||
+        "Hora por confirmar";
+
+    const nombresEquipoA = equipoA.length
+        ? equipoA.map(function(jugador, indice) {
+            return `${indice + 1}. ${jugador.nombre || "Jugador Liga Dorada"}`;
+        }).join("\n")
+        : "Aún no hay jugadores asignados.";
+
+    const nombresEquipoB = equipoB.length
+        ? equipoB.map(function(jugador, indice) {
+            return `${indice + 1}. ${jugador.nombre || "Jugador Liga Dorada"}`;
+        }).join("\n")
+        : "Aún no hay jugadores asignados.";
+
+    const mensaje =
+        `⚽ *${nombrePichanga}*\n` +
+        `📍 ${cancha}\n` +
+        `🕘 ${hora}\n\n` +
+        `🟡 *EQUIPO A*\n${nombresEquipoA}\n\n` +
+        `⚫ *EQUIPO B*\n${nombresEquipoB}\n\n` +
+        `🏆 Liga Dorada`;
+
+    const enlaceWhatsApp =
+    `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+window.open(enlaceWhatsApp, "_blank");
+}
