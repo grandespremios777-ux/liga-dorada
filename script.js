@@ -3872,3 +3872,24 @@ if (document.readyState === "loading") {
 } else {
     cargarRankingDorado();
 }
+
+
+function alternarMenuPrincipal() {
+    const menu = document.getElementById("menu-navegacion");
+
+    if (!menu) {
+        return;
+    }
+
+    menu.classList.toggle("menu-abierto");
+}
+
+function cerrarMenuPrincipal() {
+    const menu = document.getElementById("menu-navegacion");
+
+    if (!menu) {
+        return;
+    }
+
+    menu.classList.remove("menu-abierto");
+}

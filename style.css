@@ -4287,3 +4287,453 @@ footer p {
         padding: 18px 16px;
     }
 }
+
+/* =========================================
+   MENÚ PRINCIPAL — LIGA DORADA
+========================================= */
+
+.menu-principal {
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    width: 100%;
+    background: rgba(5, 15, 55, 0.96);
+    border-bottom: 1px solid rgba(244, 197, 66, 0.28);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(12px);
+}
+
+.menu-contenido {
+    width: min(1180px, calc(100% - 32px));
+    min-height: 68px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.menu-logo {
+    color: #f4c542;
+    text-decoration: none;
+    font-size: 1.15rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-shadow: 0 0 12px rgba(244, 197, 66, 0.16);
+}
+
+.btn-menu {
+    width: 44px;
+    height: 44px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(244, 197, 66, 0.42);
+    border-radius: 12px;
+    background: rgba(244, 197, 66, 0.10);
+    color: #ffe27a;
+    font-size: 1.45rem;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.btn-menu:hover {
+    background: rgba(244, 197, 66, 0.20);
+    border-color: rgba(244, 197, 66, 0.70);
+}
+
+.menu-navegacion {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.menu-navegacion a {
+    color: #e9edff;
+    text-decoration: none;
+    font-size: 0.91rem;
+    font-weight: 700;
+    padding: 10px 11px;
+    border-radius: 10px;
+    white-space: nowrap;
+    transition: 0.2s ease;
+}
+
+.menu-navegacion a:hover {
+    color: #ffe17a;
+    background: rgba(244, 197, 66, 0.12);
+}
+
+/* Menú para celular */
+@media (max-width: 900px) {
+    .menu-contenido {
+        min-height: 62px;
+    }
+
+    .btn-menu {
+        display: flex;
+    }
+
+    .menu-navegacion {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 16px;
+        right: 16px;
+        padding: 12px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        border-radius: 18px;
+        background: rgba(7, 19, 65, 0.98);
+        border: 1px solid rgba(244, 197, 66, 0.30);
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+    }
+
+    .menu-navegacion.menu-abierto {
+        display: flex;
+    }
+
+    .menu-navegacion a {
+        padding: 13px 14px;
+        border-radius: 12px;
+        font-size: 0.98rem;
+    }
+
+    .menu-navegacion a:hover {
+        background: rgba(244, 197, 66, 0.14);
+    }
+}
+
+@media (max-width: 480px) {
+    .menu-logo {
+        font-size: 1rem;
+        letter-spacing: 0.7px;
+    }
+
+    .menu-contenido {
+        width: min(100% - 24px, 1180px);
+    }
+}
+
+/* =========================================
+   AJUSTE FINAL — MENÚ HAMBURGUESA EN PC Y MÓVIL
+========================================= */
+
+.menu-contenido {
+    position: relative;
+}
+
+.btn-menu {
+    display: flex !important;
+}
+
+/* Por defecto el menú permanece cerrado */
+.menu-navegacion {
+    display: none !important;
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
+    right: 0 !important;
+    left: auto !important;
+
+    width: min(360px, calc(100vw - 32px)) !important;
+    padding: 12px !important;
+
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 5px !important;
+
+    border-radius: 18px !important;
+    background: rgba(7, 19, 65, 0.98) !important;
+    border: 1px solid rgba(244, 197, 66, 0.32) !important;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.38) !important;
+}
+
+/* Se abre solamente al tocar ☰ */
+.menu-navegacion.menu-abierto {
+    display: flex !important;
+}
+
+.menu-navegacion a {
+    display: block !important;
+    width: 100% !important;
+    padding: 13px 14px !important;
+    border-radius: 12px !important;
+    text-align: left !important;
+    font-size: 0.98rem !important;
+}
+
+.menu-navegacion a:hover {
+    background: rgba(244, 197, 66, 0.14) !important;
+}
+
+/* Ajuste del desplegable en celular */
+@media (max-width: 900px) {
+    .menu-navegacion {
+        left: 0 !important;
+        right: 0 !important;
+        width: auto !important;
+    }
+}
+
+
+/* =========================================
+   FORMAS DE CONSEGUIR PUNTOS
+========================================= */
+
+.formas-puntos-section {
+    text-align: center;
+    padding-top: 70px;
+    padding-bottom: 70px;
+}
+
+.formas-puntos-section h2 {
+    margin: 0 0 12px;
+    color: #f4c542;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 900;
+    text-shadow: 0 0 18px rgba(244, 197, 66, 0.18);
+}
+
+.formas-puntos-subtitulo {
+    max-width: 720px;
+    margin: 0 auto 34px;
+    color: #d9e0ff;
+    font-size: 1.05rem;
+    line-height: 1.6;
+}
+
+.puntos-paneles {
+    width: min(1100px, calc(100% - 32px));
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    gap: 22px;
+    text-align: left;
+}
+
+.puntos-panel {
+    border-radius: 26px;
+    padding: 24px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(14, 31, 93, 0.98), rgba(6, 19, 62, 0.98));
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
+}
+
+.puntos-panel-positivo {
+    border: 1px solid rgba(244, 197, 66, 0.34);
+}
+
+.puntos-panel-negativo {
+    border: 1px solid rgba(235, 100, 100, 0.28);
+    background: linear-gradient(180deg, rgba(71, 25, 55, 0.60), rgba(19, 19, 58, 0.98));
+}
+
+.puntos-panel-titulo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.puntos-panel-titulo > span {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+    font-size: 1.45rem;
+    background: rgba(244, 197, 66, 0.12);
+    border: 1px solid rgba(244, 197, 66, 0.22);
+}
+
+.puntos-panel-negativo .puntos-panel-titulo > span {
+    background: rgba(235, 100, 100, 0.10);
+    border-color: rgba(235, 100, 100, 0.20);
+}
+
+.puntos-panel h3 {
+    margin: 0 0 4px;
+    color: #ffffff;
+    font-size: 1.22rem;
+    font-weight: 900;
+}
+
+.puntos-panel-titulo p {
+    margin: 0;
+    color: #cbd5ff;
+    font-size: 0.9rem;
+}
+
+.puntos-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+}
+
+.punto-item {
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.punto-item span:nth-child(2) {
+    color: #ffffff;
+    font-size: 0.96rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.punto-icono {
+    font-size: 1.15rem;
+    text-align: center;
+}
+
+.punto-item strong {
+    text-align: right;
+    font-size: 1.18rem;
+    font-weight: 900;
+}
+
+.punto-suma strong {
+    color: #ffe271;
+}
+
+.punto-resta strong {
+    color: #ff9c9c;
+}
+
+.puntos-nota {
+    width: min(1100px, calc(100% - 32px));
+    margin: 22px auto 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 17px 20px;
+    border-radius: 18px;
+    text-align: left;
+    background: rgba(244, 197, 66, 0.08);
+    border: 1px solid rgba(244, 197, 66, 0.18);
+}
+
+.puntos-nota span {
+    font-size: 1.2rem;
+}
+
+.puntos-nota p {
+    margin: 0;
+    color: #d6defa;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+@media (max-width: 850px) {
+    .puntos-paneles {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .puntos-paneles,
+    .puntos-nota {
+        width: min(100% - 24px, 1100px);
+    }
+
+    .puntos-panel {
+        padding: 18px 15px;
+        border-radius: 20px;
+    }
+
+    .punto-item {
+        grid-template-columns: 30px minmax(0, 1fr) 38px;
+        padding: 10px 11px;
+        border-radius: 14px;
+    }
+
+    .punto-item span:nth-child(2) {
+        font-size: 0.88rem;
+    }
+
+    .puntos-nota {
+        padding: 15px;
+    }
+}
+
+
+/* Enlace externo de TikTok dentro del menú */
+.menu-separador {
+    height: 1px;
+    width: 100%;
+    margin: 8px 0;
+    background: rgba(244, 197, 66, 0.18);
+}
+
+.menu-navegacion .menu-tiktok {
+    color: #ffd966 !important;
+    background: rgba(244, 197, 66, 0.08);
+    border: 1px solid rgba(244, 197, 66, 0.22);
+    font-weight: 800;
+}
+
+.menu-navegacion .menu-tiktok:hover {
+    color: #ffffff !important;
+    background: rgba(244, 197, 66, 0.18);
+    border-color: rgba(244, 197, 66, 0.48);
+}
+
+
+/* Imágenes referenciales de Premios Mensuales */
+
+.premio-imagen {
+    width: 100%;
+    height: 185px;
+    margin: 0 0 18px;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid rgba(244, 197, 66, 0.22);
+    background: rgba(2, 10, 38, 0.72);
+    box-shadow:
+        0 10px 20px rgba(0, 0, 0, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.premio-imagen img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.35s ease;
+}
+
+.premio-card:hover .premio-imagen img {
+    transform: scale(1.05);
+}
+
+/* La recompensa Élite se siente un poco más grande */
+.premio-card-elite .premio-imagen {
+    height: 205px;
+    border-color: rgba(255, 215, 90, 0.42);
+    box-shadow:
+        0 12px 24px rgba(0, 0, 0, 0.28),
+        0 0 18px rgba(255, 215, 90, 0.10);
+}
+
+@media (max-width: 600px) {
+    .premio-imagen {
+        height: 175px;
+    }
+
+    .premio-card-elite .premio-imagen {
+        height: 190px;
+    }
+}
