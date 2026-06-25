@@ -21,7 +21,44 @@
 
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body id="inicio">
+
+    <header class="menu-principal">
+    <div class="menu-contenido">
+        <a href="#inicio" class="menu-logo">LIGA DORADA</a>
+
+        <button
+            id="btn-menu"
+            class="btn-menu"
+            type="button"
+            aria-label="Abrir menú"
+            onclick="alternarMenuPrincipal()"
+        >
+            ☰
+        /button>
+
+        <nav id="menu-navegacion" class="menu-navegacion">
+            <a href="#inicio" onclick="cerrarMenuPrincipal()">🏠 Inicio</a>
+            <a href="#cartelera-pichangas" onclick="cerrarMenuPrincipal()">📅 Pichangas</a>
+            <a href="#mi-perfil" onclick="cerrarMenuPrincipal()">👤 Mi Perfil</a>
+            <a href="#formas-puntos" onclick="cerrarMenuPrincipal()">⚡ Formas de conseguir puntos</a>
+            <a href="#ranking" onclick="cerrarMenuPrincipal()">🥇 Ranking Dorado</a>
+            <a href="#premios" onclick="cerrarMenuPrincipal()">🎁 Premios Mensuales</a>
+        
+            <div class="menu-separador"></div>
+
+<a
+    href="https://www.tiktok.com/@liga_dorada_de_futbol"
+    class="menu-tiktok"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    🎵 Síguenos en TikTok
+</a>
+
+        </nav>
+    </div>
+</header>
 
     <header class="hero">
         <div class="overlay">
@@ -385,6 +422,96 @@
         </div>
     </section>
 
+    <section id="formas-puntos" class="section formas-puntos-section">
+    <h2>⚡ Formas de conseguir puntos</h2>
+
+    <p class="formas-puntos-subtitulo">
+        Cada punto cuenta. Suma, compite y acércate a los Premios Mensuales de Liga Dorada.
+    </p>
+
+    <div class="puntos-paneles">
+        <div class="puntos-panel puntos-panel-positivo">
+            <div class="puntos-panel-titulo">
+                <span>✅</span>
+                <div>
+                    <h3>Acciones que suman</h3>
+                    <p>Haz crecer tu puntaje en cada pichanga.</p>
+                </div>
+            </div>
+
+            <div class="puntos-lista">
+                <div class="punto-item punto-suma">
+                    <span class="punto-icono">⚽</span>
+                    <span>Asistir a una pichanga</span>
+                    <strong>+1</strong>
+                </div>
+
+                <div class="punto-item punto-suma">
+                    <span class="punto-icono">🏆</span>
+                    <span>Ganar el partido</span>
+                    <strong>+1</strong>
+                </div>
+
+                <div class="punto-item punto-suma">
+                    <span class="punto-icono">🥅</span>
+                    <span>Marcar gol</span>
+                    <strong>+1</strong>
+                </div>
+
+                <div class="punto-item punto-suma">
+                    <span class="punto-icono">⭐</span>
+                    <span>Ser figura del partido</span>
+                    <strong>+1</strong>
+                </div>
+
+                <div class="punto-item punto-suma">
+                    <span class="punto-icono">⏱️</span>
+                    <span>Llegar puntual</span>
+                    <strong>+1</strong>
+                </div>
+
+                <div class="punto-item punto-suma">
+                    <span class="punto-icono">🤝</span>
+                    <span>Invitar a un nuevo jugador</span>
+                    <strong>+1</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="puntos-panel puntos-panel-negativo">
+            <div class="puntos-panel-titulo">
+                <span>⚠️</span>
+                <div>
+                    <h3>Acciones que restan</h3>
+                    <p>Cuida tu actitud y tu compromiso con el equipo.</p>
+                </div>
+            </div>
+
+            <div class="puntos-lista">
+                <div class="punto-item punto-resta">
+                    <span class="punto-icono">🚫</span>
+                    <span>Conducta agresiva durante el partido</span>
+                    <strong>-1</strong>
+                </div>
+
+                <div class="punto-item punto-resta">
+                    <span class="punto-icono">❌</span>
+                    <span>No asistir a una pichanga confirmada</span>
+                    <strong>-1</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="puntos-nota">
+        <span>💡</span>
+        <p>
+            Los puntos se validan por el organizador de Liga Dorada después de cada pichanga.
+            Las invitaciones se contabilizan cuando el nuevo jugador participa correctamente.
+        </p>
+    </div>
+</section>
+
     <section id="ranking" class="section ranking-section">
     <h2>🥇 Ranking Dorado</h2>
     <h3 class="ranking-subtitulo">🏆 Top Jugadores</h3>
@@ -415,7 +542,9 @@
 
     <div class="premios-grid">
         <div class="premio-card">
-            <div class="premio-icono">🎟️</div>
+            <div class="premio-imagen">
+    <img src="imagenes/pase-premio.png" alt="Pichanga gratis Liga Dorada">
+</div>
             <div class="premio-puntos">+30 PTS</div>
             <h3>Pichanga Gratis</h3>
             <p>
@@ -424,7 +553,9 @@
         </div>
 
         <div class="premio-card">
-            <div class="premio-icono">⚽</div>
+           <div class="premio-imagen">
+    <img src="imagenes/pelota-premio.png" alt="Pelota de fútbol nueva">
+</div>
             <div class="premio-puntos">+50 PTS</div>
             <h3>Pelota de Fútbol Nueva</h3>
             <p>
@@ -434,7 +565,9 @@
 
         <div class="premio-card premio-card-elite">
             <div class="premio-badge">👑 ÉLITE DORADO</div>
-            <div class="premio-icono">👟</div>
+            <div class="premio-imagen">
+    <img src="imagenes/zapatillas-premio.png" alt="Zapatillas profesionales para grass sintético">
+</div>
             <div class="premio-puntos">+100 PTS</div>
             <h3>Zapatillas Profesionales</h3>
             <p>
@@ -465,3 +598,4 @@
     <p>© 2026 Liga Dorada</p>
     <p>La comunidad del fútbol amateur</p>
 </footer>
+
