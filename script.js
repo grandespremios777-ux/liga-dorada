@@ -3893,3 +3893,54 @@ function cerrarMenuPrincipal() {
 
     menu.classList.remove("menu-abierto");
 }
+
+
+function configurarAccesoAdminOculto() {
+    const logo = document.getElementById("menu-logo");
+
+    if (!logo) {
+        return;
+    }
+
+    let temporizadorAdmin = null;
+    let accesoActivado = false;
+
+    function iniciarPresion() {
+        accesoActivado = false;
+
+        temporizadorAdmin = setTimeout(function() {
+            accesoActivado = true;
+
+            if (typeof activarAdmin === "function") {
+                activarAdmin();
+            }
+        }, 1600);
+    }
+
+    function cancelarPresion() {
+        clearTimeout(temporizadorAdmin);
+        temporizadorAdmin = null;
+    }
+
+    logo.addEventListener("pointerdown", iniciarPresion);
+    logo.addEventListener("pointerup", cancelarPresion);
+    logo.addEventListener("pointerleave", cancelarPresion);
+    logo.addEventListener("pointercancel", cancelarPresion);
+
+    logo.addEventListener("click", function(evento) {
+        if (accesoActivado) {
+            evento.preventDefault();
+            accesoActivado = false;
+        }
+    });
+
+    logo.addEventListener("contextmenu", function(evento) {
+        evento.preventDefault();
+    });
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", configurarAccesoAdminOculto);
+} else {
+    configurarAccesoAdminOculto();
+}
