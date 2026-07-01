@@ -227,6 +227,7 @@ if (mensajePerfil) {
 actualizarModoPerfil();
 
     alert("Reserva registrada correctamente");
+    mostrarConfirmacionReserva();
 
     actualizarBotonEnviar();
 }
@@ -3031,6 +3032,10 @@ function mostrarJugadoresAdminPichanga() {
                     Cambiar equipo
                 </button>
 
+                <button class="btn-admin" onclick="cambiarPosicionJugadorAdmin('${jugador.firebaseId}', '${jugador.posicion || ""}')">
+    Cambiar posición
+</button>
+
                 <button class="btn-admin-nivel" onclick="cambiarNivelJugadorAdmin('${jugador.firebaseId}', '${jugador.nivel || 1}')">
                 Cambiar nivel
                 </button>
@@ -4001,4 +4006,161 @@ async function compartirEquipos() {
     `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
 
 window.open(enlaceWhatsApp, "_blank");
+}
+
+async function cambiarPosicionJugadorAdmin(firebaseId, posicionActual) {
+    const posicionesValidas = [
+        "Arquero",
+        "Defensa",
+        "Mediocampista",
+        "Delantero"
+    ];
+
+    const nuevaPosicion = prompt(
+        "Cambiar posición del jugador.\n\n" +
+        "Escribe una de estas opciones:\n" +
+        "Arquero\n" +
+        "Defensa\n" +
+        "Mediocampista\n" +
+        "Delantero\n\n" +
+        `Posición actual: ${posicionActual || "No definida"}`
+    );
+
+    if (nuevaPosicion === null) {
+        return;
+    }
+
+    const posicionLimpia = nuevaPosicion.trim();
+
+    const posicionCorrecta = posicionesValidas.find(function(posicion) {
+        return posicion.toLowerCase() === posicionLimpia.toLowerCase();
+    });
+
+    if (!posicionCorrecta) {
+        alert(
+            "Posición no válida.\n\n" +
+            "Usa solamente: Arquero, Defensa, Mediocampista o Delantero."
+        );
+        return;
+    }
+
+    try {
+        const config = window.firebaseConfig;
+
+        const urlInscrito =
+            `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+            `/databases/(default)/documents/inscritos/${firebaseId}` +
+            `?updateMask.fieldPaths=posicion&key=${config.apiKey}`;
+
+        const respuestaInscrito = await fetch(urlInscrito, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                fields: {
+                    posicion: {
+                        stringValue: posicionCorrecta
+                    }
+                }
+            })
+        });
+
+        if (!respuestaInscrito.ok) {
+            throw new Error("No se pudo actualizar la posición en la pichanga.");
+        }
+
+        const jugadorActual = jugadores.find(function(jugador) {
+            return jugador.firebaseId === firebaseId;
+        });
+
+        if (jugadorActual && jugadorActual.whatsapp) {
+            const urlPerfil =
+                `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+                `/databases/(default)/documents/jugadoresPerfil/` +
+                `${encodeURIComponent(jugadorActual.whatsapp)}` +
+                `?updateMask.fieldPaths=posicion&key=${config.apiKey}`;
+
+            const respuestaPerfil = await fetch(urlPerfil, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    fields: {
+                        posicion: {
+                            stringValue: posicionCorrecta
+                        }
+                    }
+                })
+            });
+
+            if (!respuestaPerfil.ok) {
+                throw new Error(
+                    "La posición se actualizó en la pichanga, pero no en el perfil permanente."
+                );
+            }
+        }
+
+        await refrescarAdminJugadores();
+
+        alert(`✅ Posición actualizada a: ${posicionCorrecta}`);
+
+    } catch (error) {
+        console.error("Error al cambiar posición:", error);
+
+        alert(
+            "❌ No se pudo actualizar la posición.\n\n" +
+            "Revisa la consola antes de intentarlo nuevamente."
+        );
+    }
+}
+
+function mostrarConfirmacionReserva() {
+    const seccionReserva = document.getElementById("reserva-exitosa");
+
+    if (!seccionReserva) {
+        return;
+    }
+
+    seccionReserva.style.display = "block";
+
+    const nombrePichanga =
+        localStorage.getItem("pichangaSeleccionadaNombre") ||
+        "Liga Dorada";
+
+    const botonWhatsApp = document.getElementById("btn-whatsapp-pago");
+
+    if (botonWhatsApp) {
+        const mensaje =
+            `Hola, acabo de reservar mi cupo en ${nombrePichanga}. ` +
+            `Te envío mi captura de pago para confirmar mi reserva.`;
+
+        botonWhatsApp.href =
+            `https://wa.me/51978206205?text=${encodeURIComponent(mensaje)}`;
+    }
+
+    setTimeout(function() {
+        seccionReserva.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }, 150);
+}
+
+function volverAPichangasDesdeReserva() {
+    const seccionReserva = document.getElementById("reserva-exitosa");
+
+    if (seccionReserva) {
+        seccionReserva.style.display = "none";
+    }
+
+    const cartelera = document.getElementById("cartelera-pichangas");
+
+    if (cartelera) {
+        cartelera.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
 }
