@@ -1034,7 +1034,9 @@ async function cargarJugadoresFirebase() {
     goles: campos.goles ? Number(campos.goles.integerValue || campos.goles.stringValue) : 0,
     partidosJugados: campos.partidosJugados ? Number(campos.partidosJugados.integerValue) : 0,
     puntos: campos.puntos ? Number(campos.puntos.integerValue) : 0,
-    estado: campos.estado ? campos.estado.stringValue : "Pendiente de pago"
+    estado: campos.estado ? campos.estado.stringValue : "Pendiente de pago",
+    reputacion: campos.reputacion ? campos.reputacion.stringValue : "Confiable 100%"
+    
 };
         });
 
@@ -1970,8 +1972,9 @@ async function cargarPerfilJugadorFirebase(whatsapp) {
     partidosJugados: campos.partidosJugados ? Number(campos.partidosJugados.integerValue) : 0,
     goles: campos.goles ? Number(campos.goles.integerValue) : 0,
     puntos: campos.puntos ? Number(campos.puntos.integerValue) : 0,
-    pieDominante: campos.pieDominante ? campos.pieDominante.stringValue : "No definido"
-};
+    pieDominante: campos.pieDominante ? campos.pieDominante.stringValue : "No definido",
+    reputacion: campos.reputacion ? campos.reputacion.stringValue : "Confiable"
+    };
 
     } catch (error) {
         console.error("Error cargando perfil del jugador:", error);
@@ -2102,7 +2105,8 @@ async function obtenerPerfilPorWhatsapp(whatsapp) {
         pieDominante: data.fields.pieDominante?.stringValue || "",
         partidosJugados: Number(data.fields.partidosJugados?.integerValue || 0),
         goles: Number(data.fields.goles?.integerValue || 0),
-        puntos: Number(data.fields.puntos?.integerValue || 0)
+        puntos: Number(data.fields.puntos?.integerValue || 0),
+        reputacion: data.fields.reputacion?.stringValue || "Confiable 100%"
     };
 }
 
@@ -2137,7 +2141,19 @@ async function buscarMiPerfil() {
             <div class="perfil-avatar-grande">👤</div>
 
             <div class="perfil-main">
-                <h3>${perfil.nombre || "Jugador Liga Dorada"}</h3>
+                <div class="perfil-nombre-reputacion">
+    <h3>${perfil.nombre || "Jugador Liga Dorada"}</h3>
+
+    <span class="reputacion-mini ${
+    (perfil.reputacion || "Confiable").toLowerCase().startsWith("no confiable")
+        ? "reputacion-no-confiable"
+        : (perfil.reputacion || "Confiable").toLowerCase().startsWith("poco confiable")
+            ? "reputacion-poco-confiable"
+            : "reputacion-confiable"
+}">
+    🛡️ ${perfil.reputacion || "Confiable"}
+</span>
+</div>
                 <p class="perfil-meta">
                     ${perfil.edad ? perfil.edad + " años" : "Edad no definida"} · 
                     ${perfil.distrito || "Distrito no definido"}
@@ -2149,6 +2165,7 @@ async function buscarMiPerfil() {
         </div>
 
         <div class="perfil-stats-grid">
+
             <div class="stat-mini-card">
                 <span class="stat-label">Nivel</span>
                 <strong>${perfil.nivel || 1} ⭐</strong>
@@ -3050,6 +3067,13 @@ function mostrarJugadoresAdminPichanga() {
 
                 <button class="btn-admin-nivel" onclick="cambiarGolesJugadorAdmin('${jugador.firebaseId}', '${jugador.goles || 0}')">
     Cambiar goles
+</button>
+
+<button
+    class="btn-admin"
+    onclick="cambiarReputacionJugadorAdmin('${jugador.firebaseId}')"
+>
+    Cambiar reputación
 </button>
 
 <button class="btn-admin-eliminar" onclick="eliminarJugadorAdmin('${jugador.firebaseId}')">
@@ -4162,5 +4186,113 @@ function volverAPichangasDesdeReserva() {
             behavior: "smooth",
             block: "start"
         });
+    }
+}
+
+async function cambiarReputacionJugadorAdmin(firebaseId) {
+    const jugadorActual = jugadores.find(function(jugador) {
+        return jugador.firebaseId === firebaseId;
+    });
+
+    if (!jugadorActual) {
+        alert("No se encontró al jugador seleccionado.");
+        return;
+    }
+
+    const reputacionActual =
+        jugadorActual.reputacion || "Confiable 100%";
+
+    const nuevaReputacion = prompt(
+        "Cambiar reputación del jugador.\n\n" +
+        "Escribe manualmente la reputación y porcentaje.\n\n" +
+        "Ejemplos:\n" +
+        "Confiable 100%\n" +
+        "Confiable 50%\n" +
+        "Poco confiable 40%\n" +
+        "No confiable 10%",
+        reputacionActual
+    );
+
+    if (nuevaReputacion === null) {
+        return;
+    }
+
+    const reputacionLimpia = nuevaReputacion.trim();
+
+    if (!reputacionLimpia) {
+        alert("Debes escribir una reputación.");
+        return;
+    }
+
+    if (reputacionLimpia.length > 40) {
+        alert("La reputación debe tener máximo 40 caracteres.");
+        return;
+    }
+
+    try {
+        const config = window.firebaseConfig;
+
+        const urlInscrito =
+            `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+            `/databases/(default)/documents/inscritos/${firebaseId}` +
+            `?updateMask.fieldPaths=reputacion&key=${config.apiKey}`;
+
+        const respuestaInscrito = await fetch(urlInscrito, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                fields: {
+                    reputacion: {
+                        stringValue: reputacionLimpia
+                    }
+                }
+            })
+        });
+
+        if (!respuestaInscrito.ok) {
+            throw new Error("No se pudo actualizar la reputación en la pichanga.");
+        }
+
+        if (jugadorActual.whatsapp) {
+            const urlPerfil =
+                `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+                `/databases/(default)/documents/jugadoresPerfil/` +
+                `${encodeURIComponent(jugadorActual.whatsapp)}` +
+                `?updateMask.fieldPaths=reputacion&key=${config.apiKey}`;
+
+            const respuestaPerfil = await fetch(urlPerfil, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    fields: {
+                        reputacion: {
+                            stringValue: reputacionLimpia
+                        }
+                    }
+                })
+            });
+
+            if (!respuestaPerfil.ok) {
+                throw new Error(
+                    "La reputación se actualizó en la pichanga, pero no en el perfil."
+                );
+            }
+        }
+
+        await refrescarAdminJugadores();
+
+        alert(`✅ Reputación actualizada: ${reputacionLimpia}`);
+
+    } catch (error) {
+        console.error("Error al cambiar reputación:", error);
+
+        alert(
+            "❌ No se pudo actualizar la reputación.\n\n" +
+            "Revisa la consola antes de intentarlo nuevamente."
+        );
     }
 }

@@ -5009,3 +5009,127 @@ footer p {
         height: 120px;
     }
 }
+
+/* =========================================
+   REPUTACIÓN DEL JUGADOR
+========================================= */
+
+.stat-card-reputacion {
+    border-color: rgba(244, 197, 66, 0.30) !important;
+    background: linear-gradient(
+        135deg,
+        rgba(244, 197, 66, 0.10),
+        rgba(14, 31, 93, 0.55)
+    ) !important;
+}
+
+.reputacion-confiable,
+.reputacion-poco-confiable,
+.reputacion-no-confiable {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    margin-top: 4px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.84rem !important;
+    font-weight: 900 !important;
+    line-height: 1.1;
+}
+
+.reputacion-confiable {
+    color: #c9ffd7 !important;
+    background: rgba(65, 189, 103, 0.15);
+    border: 1px solid rgba(92, 227, 131, 0.35);
+}
+
+.reputacion-poco-confiable {
+    color: #ffe8a6 !important;
+    background: rgba(255, 184, 55, 0.14);
+    border: 1px solid rgba(255, 198, 76, 0.38);
+}
+
+.reputacion-no-confiable {
+    color: #ffd0d0 !important;
+    background: rgba(221, 73, 73, 0.15);
+    border: 1px solid rgba(255, 111, 111, 0.38);
+}
+
+/* Reputación compacta junto al nombre del jugador */
+
+.perfil-nombre-reputacion {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.perfil-nombre-reputacion h3 {
+    margin: 0 !important;
+}
+
+.reputacion-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.reputacion-mini.reputacion-confiable {
+    color: #c9ffd7;
+    background: rgba(65, 189, 103, 0.16);
+    border: 1px solid rgba(92, 227, 131, 0.40);
+}
+
+.reputacion-mini.reputacion-poco-confiable {
+    color: #ffe8a6;
+    background: rgba(255, 184, 55, 0.14);
+    border: 1px solid rgba(255, 198, 76, 0.38);
+}
+
+.reputacion-mini.reputacion-no-confiable {
+    color: #ffd0d0;
+    background: rgba(221, 73, 73, 0.16);
+    border: 1px solid rgba(255, 111, 111, 0.40);
+}
+
+@media (max-width: 560px) {
+    .perfil-nombre-reputacion {
+        gap: 7px;
+    }
+
+    .reputacion-mini {
+        padding: 4px 8px;
+        font-size: 0.68rem;
+    }
+}
+
+/* Ajuste de datos del perfil debajo del nombre */
+
+.perfil-main {
+    flex: 1;
+    min-width: 0;
+    text-align: left !important;
+}
+
+.perfil-main .perfil-meta,
+.perfil-main .perfil-id {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    text-align: left !important;
+}
+
+.perfil-main .perfil-meta {
+    margin-top: 8px !important;
+}
+
+.perfil-main .perfil-id {
+    margin-top: 4px !important;
+}
