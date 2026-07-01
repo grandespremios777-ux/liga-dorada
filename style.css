@@ -4743,3 +4743,269 @@ footer p {
     width: fit-content;
     margin: 0 auto 24px;
 }
+
+/* =========================================
+   CONFIRMACIÓN DE RESERVA Y PAGO PENDIENTE
+========================================= */
+
+.reserva-exitosa-section {
+    padding-top: 70px;
+    padding-bottom: 80px;
+}
+
+.reserva-exitosa-card {
+    width: min(680px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 38px 32px;
+    text-align: center;
+    border-radius: 30px;
+    background:
+        linear-gradient(180deg, rgba(13, 31, 94, 0.98), rgba(5, 16, 54, 0.98));
+    border: 1px solid rgba(244, 197, 66, 0.42);
+    box-shadow:
+        0 22px 46px rgba(0, 0, 0, 0.34),
+        0 0 24px rgba(244, 197, 66, 0.08);
+}
+
+.reserva-exitosa-icono {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 2rem;
+    background: rgba(93, 205, 129, 0.13);
+    border: 1px solid rgba(116, 228, 151, 0.35);
+    box-shadow: 0 0 20px rgba(93, 205, 129, 0.14);
+}
+
+.reserva-exitosa-etiqueta {
+    display: inline-block;
+    padding: 7px 13px;
+    border-radius: 999px;
+    color: #ffe17a;
+    background: rgba(244, 197, 66, 0.11);
+    border: 1px solid rgba(244, 197, 66, 0.25);
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+}
+
+.reserva-exitosa-card h2 {
+    margin: 18px 0 10px;
+    color: #ffffff;
+    font-size: clamp(1.7rem, 4vw, 2.35rem);
+    font-weight: 900;
+}
+
+.reserva-exitosa-mensaje {
+    margin: 0 auto 24px;
+    color: #d7dffb;
+    font-size: 1rem;
+    line-height: 1.55;
+}
+
+.reserva-pendiente-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px;
+    margin-bottom: 18px;
+    text-align: left;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(120, 18, 32, 0.96), rgba(70, 10, 18, 0.98));
+    border: 1px solid rgba(255, 120, 120, 0.34);
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.20),
+        0 0 18px rgba(255, 70, 70, 0.12);
+}
+
+.reserva-pendiente-icono {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 170, 170, 0.25);
+    box-shadow: 0 0 12px rgba(255, 100, 100, 0.12);
+}
+
+.reserva-pendiente-contenido strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #ffd3d3;
+    font-size: 1rem;
+    font-weight: 900;
+}
+
+.reserva-pendiente-contenido p {
+    margin: 0;
+    color: #fff1f1;
+    font-size: 0.93rem;
+    line-height: 1.52;
+}
+
+.reserva-alerta-extra {
+    margin-top: 12px !important;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 190, 190, 0.18);
+    color: #ffe5e5 !important;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.datos-pago-box {
+    padding: 22px 18px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.datos-pago-titulo {
+    margin: 0 0 8px;
+    color: #ffffff;
+    font-size: 1.05rem;
+    font-weight: 900;
+}
+
+.datos-pago-texto,
+.titular-pago,
+.datos-pago-instruccion {
+    margin: 0;
+    color: #d8e0ff;
+    font-size: 0.94rem;
+    line-height: 1.55;
+}
+
+.numero-pago {
+    width: fit-content;
+    margin: 14px auto 8px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ffe57b, #d6a71f);
+    color: #07143d;
+    font-size: 1.28rem;
+    font-weight: 900;
+    box-shadow: 0 8px 18px rgba(244, 197, 66, 0.20);
+}
+
+.titular-pago {
+    margin-bottom: 13px;
+}
+
+.datos-pago-instruccion strong {
+    color: #ffe17a;
+}
+
+.btn-whatsapp-pago {
+    display: block;
+    width: fit-content;
+    margin: 22px auto 12px;
+    text-decoration: none;
+}
+
+.btn-volver-pichangas {
+    border: 0;
+    background: transparent;
+    color: #dbe3ff;
+    font: inherit;
+    font-size: 0.93rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.btn-volver-pichangas:hover {
+    color: #ffe17a;
+}
+
+@media (max-width: 560px) {
+    .reserva-exitosa-card {
+        width: min(100% - 24px, 680px);
+        padding: 28px 18px;
+        border-radius: 23px;
+    }
+
+    .reserva-pendiente-box {
+        padding: 15px;
+    }
+
+    .numero-pago {
+        font-size: 1.13rem;
+    }
+}
+
+/* QR de pago dentro de confirmación de reserva */
+
+.datos-pago-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 125px;
+    align-items: center;
+    gap: 18px;
+}
+
+.datos-pago-info {
+    text-align: center;
+}
+
+.qr-pago-box {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    border-radius: 15px;
+    background: #ffffff;
+    border: 2px solid rgba(244, 197, 66, 0.75);
+    box-shadow:
+        0 8px 18px rgba(0, 0, 0, 0.24),
+        0 0 14px rgba(244, 197, 66, 0.14);
+}
+
+.qr-pago-box img {
+    display: block;
+    width: 104px;
+    height: 104px;
+    object-fit: contain;
+    background: #ffffff;
+}
+
+.qr-pago-box span {
+    color: #08143d;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.datos-pago-instruccion {
+    margin-top: 16px !important;
+    text-align: center;
+}
+
+@media (max-width: 560px) {
+    .datos-pago-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .qr-pago-box {
+        width: fit-content;
+        margin: 0 auto;
+    }
+
+    .qr-pago-box img {
+        width: 120px;
+        height: 120px;
+    }
+}

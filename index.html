@@ -529,7 +529,94 @@
     </div>
 </section>
 
+<section id="reserva-exitosa" class="section reserva-exitosa-section" style="display: none;">
+    <div class="reserva-exitosa-card">
+        <div class="reserva-exitosa-icono">✅</div>
 
+        <span class="reserva-exitosa-etiqueta">
+            RESERVA REGISTRADA
+        </span>
+
+        <h2>Tu reserva ha sido exitosa</h2>
+
+        <p class="reserva-exitosa-mensaje">
+            Tu cupo fue separado correctamente en Liga Dorada.
+        </p>
+
+        <div class="reserva-pendiente-box">
+    <div class="reserva-pendiente-icono">🚨</div>
+
+    <div class="reserva-pendiente-contenido">
+        <strong>Pago pendiente</strong>
+
+        <p>
+            Tu pago todavía no ha sido completado. Tu reserva se mantendrá
+            entre 24 y 48 horas, según indique el administrador.
+        </p>
+
+        <p class="reserva-alerta-extra">
+            El inscribirse y no ir o cancelar la pichanga, afecta tu puntaje
+            como jugador confiable y se mostrará en tu perfil
+            (dentro de reputación de jugador).
+        </p>
+    </div>
+</div>
+
+        <div class="datos-pago-box">
+    <div class="datos-pago-layout">
+        <div class="datos-pago-info">
+            <p class="datos-pago-titulo">
+                Para confirmar tu pago:
+            </p>
+
+            <p class="datos-pago-texto">
+                Realiza tu Yape o Plin al siguiente número:
+            </p>
+
+            <div class="numero-pago">
+                <span>📱</span>
+                <strong>930 665 396</strong>
+            </div>
+
+            <p class="titular-pago">
+                A nombre de <strong>Moises Polino</strong>
+            </p>
+        </div>
+
+        <div class="qr-pago-box">
+            <img
+                src="qr-pago.png"
+                alt="Código QR para pagar por Yape o Plin"
+            >
+            <span>Escanea para pagar</span>
+        </div>
+    </div>
+
+    <p class="datos-pago-instruccion">
+        Luego envía tu captura de pago al mismo número por WhatsApp
+        para que tu reserva figure como <strong>Pago confirmado</strong>.
+    </p>
+</div>
+
+        <a
+            id="btn-whatsapp-pago"
+            class="btn-gold btn-whatsapp-pago"
+            href="https://wa.me/51978206205"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+            💬 Enviar captura por WhatsApp
+        </a>
+
+        <button
+            type="button"
+            class="btn-volver-pichangas"
+            onclick="volverAPichangasDesdeReserva()"
+        >
+            Ver próximas pichangas
+        </button>
+    </div>
+</section>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
