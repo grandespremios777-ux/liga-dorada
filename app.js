@@ -1,1596 +1,4298 @@
-// Inicializar Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
-const providerGoogle = new firebase.auth.GoogleAuthProvider();
+let adminActivo = false;
 
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-  .then(() => {
-    console.log("Persistencia de sesión activada");
-  })
-  .catch((error) => {
-    console.error("Error configurando persistencia:", error);
-  });
+const CLAVE_ADMIN = "LigaDorada2026";
 
-// Mapa centrado en Lima
-const map = L.map('map').setView([-12.0464, -77.0428], 13);
+let partidoId = "pichanga_actual";
+let pichangasCargadas = [];
+let conteoInscritosPorPichanga = {};
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap'
-}).addTo(map);
+let jugadores = JSON.parse(localStorage.getItem("jugadores")) || [];
 
-let ubicacionSeleccionada = null;
-let marcadorUsuario = null;
-let marcadorSeleccion = null;
-let siguiendoUsuario = true;
-let temporizadorReencuadre = null;
-let usuarioActual = null;
-let perfilUsuario = null;
-function esAdmin() {
-  return perfilUsuario && perfilUsuario.rol === "admin";
-}
+let inscritos = jugadores.length;
 
-function esPremium() {
-  return esAdmin() || (perfilUsuario && perfilUsuario.premium === true);
-}
+localStorage.setItem("inscritos", inscritos);
 
-function actualizarEstiloPremiumUsuario() {
-  const usuarioInfo = document.getElementById('usuario-info');
-
-  if (!usuarioInfo) return;
-
-  let etiquetaPremium = document.getElementById('etiqueta-premium');
-
-  if (esPremium()) {
-    usuarioInfo.classList.add('usuario-premium');
-
-    if (!etiquetaPremium) {
-      etiquetaPremium = document.createElement('span');
-      etiquetaPremium.id = 'etiqueta-premium';
-      etiquetaPremium.className = 'etiqueta-premium';
-      etiquetaPremium.textContent = '⭐ PREMIUM';
-
-      const botonSalir = document.getElementById('btn-logout');
-
-      if (botonSalir) {
-        usuarioInfo.insertBefore(etiquetaPremium, botonSalir);
-      } else {
-        usuarioInfo.appendChild(etiquetaPremium);
-      }
-    }
-  } else {
-    usuarioInfo.classList.remove('usuario-premium');
-
-    if (etiquetaPremium) {
-      etiquetaPremium.remove();
-    }
-  }
-}
-
-let ubicacionUsuarioActual = null;
-
-
-const marcadoresAlertas = {};
-const alertasEnMemoria = {};
-
-/*
-  Los comentarios y votos ya no se guardan dentro del documento principal
-  de la alerta. Android usa subcolecciones y la web queda alineada:
-  alertas/{alertaId}/comentarios/{comentarioId}
-  alertas/{alertaId}/votos/{uidUsuario}
-*/
-const comentariosPorAlerta = {};
-const votosUsuarioPorAlerta = {};
-const listenersComentariosPorAlerta = {};
-const listenersVotosPorAlerta = {};
-let alertaPopupAbiertaId = null;
-
-let anguloAuto = 0;
-
-/* Tu imagen fue recortada con la parte frontal hacia abajo.
-   Este ajuste hace que al iniciar mire hacia arriba del mapa. */
-const AJUSTE_ORIENTACION_AUTO = 180;
-
-const autosPorColor = {
-  rojo: "img/auto-rojo.png",
-  blanco: "img/auto-blanco.png",
-  negro: "img/auto-negro.png",
-  azul: "img/auto-azul.png",
-  amarillo: "img/auto-amarillo.png"
+let datosPartido = JSON.parse(localStorage.getItem("datosPartido")) || {
+    modalidad: "Fulbito 9 vs 9",
+    cancha: "Cancha La 12",
+    hora: "Jueves 10:30 PM",
+    precio: "S/18 por jugador"
 };
 
-const nombresColorAuto = {
-  rojo: "Rojo",
-  blanco: "Blanco",
-  negro: "Negro",
-  azul: "Azul",
-  amarillo: "Amarillo"
-};
-
-function obtenerColorAutoActual() {
-  const colorGuardado = perfilUsuario?.colorAuto;
-
-  /* Gratis y visitante siempre ven el auto rojo */
-  if (!esPremium()) {
-    return "rojo";
-  }
-
-  /* Premium usa su color guardado; rojo es el predeterminado */
-  if (autosPorColor[colorGuardado]) {
-    return colorGuardado;
-  }
-
-  return "rojo";
-}
-
-function crearIconoAuto(angulo = 0) {
-  const colorAuto = obtenerColorAutoActual();
-  const imagenAuto = autosPorColor[colorAuto];
-
-  return L.divIcon({
-    className: "icono-auto-cenital",
-    html: `
-      <img
-        src="${imagenAuto}"
-        alt="Tu ubicación"
-        style="transform: rotate(${angulo + AJUSTE_ORIENTACION_AUTO}deg);"
-      >
-    `,
-    iconSize: [54, 54],
-    iconAnchor: [27, 27]
-  });
-}
-
-function actualizarIconoAuto() {
-  if (!marcadorUsuario) return;
-
-  marcadorUsuario.setIcon(crearIconoAuto(anguloAuto));
-}
-
-function calcularAnguloDireccion(origen, destino) {
-  const lat1 = origen.lat * Math.PI / 180;
-  const lng1 = origen.lng * Math.PI / 180;
-  const lat2 = destino.lat * Math.PI / 180;
-  const lng2 = destino.lng * Math.PI / 180;
-
-  const diferenciaLng = lng2 - lng1;
-
-  const y = Math.sin(diferenciaLng) * Math.cos(lat2);
-
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(diferenciaLng);
-
-  const grados = Math.atan2(y, x) * 180 / Math.PI;
-
-  return (grados + 360) % 360;
-}
-
-const tiposAlerta = {
-  "Manifestación": { emoji: "📢", color: "#ff9800" },
-  "Robo": { emoji: "🚨", color: "#d10000" },
-  "Choque": { emoji: "💥", color: "#e53935" },
-  "Atunes": { icono: "img/casco-azul.png", color: "#c8daec" },
-  "Calle cerrada": { emoji: "⛔", color: "#424242" },
-  
-"Radar de velocidad": {
-  icono: "img/camara-velocidad.png",
-  color: "#ffffff"
-},
-
-"Incendio": { emoji: "🔥", color: "#464646" },
-"Radar temporal": { emoji: "📡", color: "#ffffff" }
-};
-
-function obtenerEstadoAlerta(confirmaciones, negativos) {
-  if (negativos >= 3 && negativos > confirmaciones) {
-    return {
-      texto: "Dudosa / posible falsa",
-      emoji: "🔴",
-      color: "#d32f2f"
-    };
-  }
-
-  if (confirmaciones >= 3) {
-    return {
-      texto: "Confirmada por usuarios",
-      emoji: "🟢",
-      color: "#2e7d32"
-    };
-  }
-
-  return {
-    texto: "Poca confirmación",
-    emoji: "🟡",
-    color: "#f9a825"
-  };
-}
-
-function crearIconoAlerta(tipo, confirmaciones = 0, negativos = 0) {
-  const data = tiposAlerta[tipo] || { emoji: "⚠️", color: "#d10000" };
-  const estado = obtenerEstadoAlerta(confirmaciones, negativos);
-
-  if (data.icono) {
-    return L.divIcon({
-      className: 'icono-alerta-img',
-      html: `
-        <div style="border-color:${estado.color}" class="burbuja-alerta-img">
-          <img src="${data.icono}" alt="${tipo}" />
-        </div>
-      `,
-      iconSize: [52, 52],
-      iconAnchor: [26, 26]
-    });
-  }
-
-  return L.divIcon({
-    className: 'icono-alerta',
-    html: `
-      <div style="background:${data.color}; border-color:${estado.color}" class="burbuja-alerta">
-        ${data.emoji}
-      </div>
-    `,
-    iconSize: [42, 42],
-    iconAnchor: [21, 21]
-  });
-}
-
-function calcularDistanciaMetros(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const rad = Math.PI / 180;
-
-  const dLat = (lat2 - lat1) * rad;
-  const dLng = (lng2 - lng1) * rad;
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * rad) *
-    Math.cos(lat2 * rad) *
-    Math.sin(dLng / 2) *
-    Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
-
-function formatearDistancia(metros) {
-  if (metros < 1000) {
-    return `${Math.round(metros)} m`;
-  }
-
-  return `${(metros / 1000).toFixed(1)} km`;
-}
-
-function obtenerFechaVencimiento(alerta) {
-  if (alerta.expiresAt && alerta.expiresAt.toDate) {
-    return alerta.expiresAt.toDate();
-  }
-
-  if (alerta.expiresAt) {
-    return new Date(alerta.expiresAt);
-  }
-
-  return null;
-}
-
-function formatearHoraComentario(hora) {
-  if (!hora) return "Ahora";
-
-  let fechaComentario;
-
-  if (hora.toDate) {
-    fechaComentario = hora.toDate();
-  } else {
-    fechaComentario = new Date(hora);
-  }
-
-  const diferencia = Date.now() - fechaComentario.getTime();
-  const minutos = Math.floor(diferencia / (1000 * 60));
-  const horas = Math.floor(minutos / 60);
-
-  if (minutos < 1) return "Ahora";
-  if (minutos < 60) return `Hace ${minutos} min`;
-  if (horas < 24) return `Hace ${horas} h`;
-
-  return fechaComentario.toLocaleDateString("es-PE", {
-    day: "2-digit",
-    month: "short"
-  });
-}
-
-function escaparHtml(valor) {
-  return String(valor ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-window.mostrarInfoLogin = function(accion) {
-  alert(`Inicia sesión con Google para ${accion}.`);
-};
-
-window.mostrarInfoPremium = function(funcion) {
-  alert(`${funcion} es una función Premium. Activa Premium para desbloquearla.`);
-};
-
-function crearPopupAlerta(id, alerta) {
-  const vence = obtenerFechaVencimiento(alerta);
-  const esAlertaPermanente = alerta.permanente === true;
-  const bloqueEliminarAdmin =
-    esAdmin() && esAlertaPermanente
-      ? `
-        <button
-          onclick="eliminarAlertaPermanente('${id}')"
-          style="
-            width:100%;
-            margin-top:10px;
-            padding:8px;
-            border:1px solid #d62828;
-            border-radius:9px;
-            background:#fff4f4;
-            color:#b00000;
-            font-weight:800;
-            cursor:pointer;
-          "
-        >
-          🗑 Eliminar alerta permanente
-        </button>
-      `
-      : "";
-
-  const confirmaciones = alerta.confirmaciones || 0;
-  const negativos = alerta.negativos || 0;
-  const estado = obtenerEstadoAlerta(confirmaciones, negativos);
-  const alertaEsPremium = alerta.creadorPremium === true;
-
-  const clasePremiumPopup = alertaEsPremium
-    ? " popup-alerta-premium"
-    : "";
-
-  const clasePremiumCreador = alertaEsPremium
-    ? " creador-alerta-premium"
-    : "";
-
-  const etiquetaPremiumCreador = alertaEsPremium
-    ? `<span class="badge-creador-premium">⭐ PREMIUM</span>`
-    : "";
-
-  const claseVistaUsuario = !usuarioActual
-    ? " vista-visitante"
-    : esPremium()
-      ? " vista-premium"
-      : " vista-google";
-
-  /*
-    Compatibilidad: los comentarios antiguos creados por la web estaban
-    dentro de alerta.comentarios. Los nuevos llegan desde la subcolección
-    igual que en Android.
-  */
-  const comentariosModernos = comentariosPorAlerta[id] || [];
-  const comentariosAntiguos = Array.isArray(alerta.comentarios)
-    ? alerta.comentarios.map((comentario, indice) => ({
-        id: `antiguo-${indice}`,
-        texto: typeof comentario === "string"
-          ? comentario
-          : comentario.texto,
-        nombre: typeof comentario === "string"
-          ? "Usuario"
-          : comentario.nombre,
-        foto: typeof comentario === "string"
-          ? ""
-          : comentario.foto,
-        hora: typeof comentario === "string"
-          ? null
-          : comentario.hora
-      }))
-    : [];
-
-  const comentarios = [
-    ...comentariosModernos,
-    ...comentariosAntiguos
-  ].slice(0, 6);
-
-  const votoActual = usuarioActual
-    ? votosUsuarioPorAlerta[id] || null
-    : null;
-
-  let distanciaTexto = "Ubicación no disponible";
-
-  if (ubicacionUsuarioActual) {
-    const distancia = calcularDistanciaMetros(
-      ubicacionUsuarioActual.lat,
-      ubicacionUsuarioActual.lng,
-      alerta.lat,
-      alerta.lng
-    );
-
-    distanciaTexto = formatearDistancia(distancia);
-  }
-
-  const listaComentarios = comentariosPorAlerta[id] === undefined &&
-    comentariosAntiguos.length === 0
-    ? `
-      <li class="comentarios-cargando">
-        Cargando comentarios…
-      </li>
-    `
-    : comentarios.length
-      ? comentarios.map((comentario) => `
-          <li class="comentario-item">
-            <div class="comentario-header">
-              ${
-                comentario.foto
-                  ? `
-                    <img
-                      src="${escaparHtml(comentario.foto)}"
-                      class="comentario-foto"
-                      alt=""
-                    >
-                  `
-                  : ""
-              }
-
-              <div>
-                <span class="comentario-nombre">
-                  ${escaparHtml(comentario.nombre || "Usuario")}
-                </span>
-                <br>
-                <span class="comentario-hora">
-                  ${formatearHoraComentario(comentario.hora)}
-                </span>
-              </div>
-            </div>
-
-            <p>${escaparHtml(comentario.texto || "")}</p>
-          </li>
-        `).join("")
-      : "<li class=\"comentarios-vacios\">Aún no hay comentarios</li>";
-
-  const bloqueDetalle = esPremium()
-    ? `<p>${escaparHtml(alerta.descripcion || "Sin detalle adicional.")}</p>`
-    : alerta.descripcion === "Alerta rápida" || !alerta.descripcion
-      ? `<p>Alerta rápida</p>`
-      : `
-        <div style="display:flex; gap:6px; margin:8px 0;">
-          <button
-            onclick="mostrarInfoPremium('Ver el detalle completo')"
-            style="flex:1; padding:8px; border:none; border-radius:8px; background:#eeeeee; color:#333;"
-          >
-            🔒 Ver detalle completo
-          </button>
-
-          <button
-            onclick="mostrarInfoPremium('Ver el detalle completo')"
-            style="padding:8px; border:none; border-radius:8px; background:#ffb300; color:#111; font-weight:800;"
-          >
-            ⭐ Premium
-          </button>
-        </div>
-      `;
-
-  const bloqueComentarios = `
-    <strong>💬 Comentarios</strong>
-    <ul class="lista-comentarios">
-      ${listaComentarios}
-    </ul>
-  `;
-
-  const bloqueComentar = usuarioActual
-    ? `
-      <input
-        id="comentario-${id}"
-        type="text"
-        maxlength="280"
-        placeholder="Escribe un comentario..."
-        style="width:100%; padding:8px; box-sizing:border-box; margin-top:8px;"
-      />
-
-      <button
-        onclick="comentarAlerta('${id}')"
-        style="width:100%; margin-top:6px; padding:8px; border:none; border-radius:8px; background:#222; color:white;"
-      >
-        💬 Publicar comentario
-      </button>
-    `
-    : `
-      <button
-        onclick="mostrarInfoLogin('comentar una alerta')"
-        style="width:100%; margin-top:8px; padding:8px; border:none; border-radius:8px; background:#1976d2; color:white; font-weight:800;"
-      >
-        🔐 Entra con Google para comentar
-      </button>
-    `;
-
-  const textoConfirmar = votoActual === "confirmar"
-    ? "✓ Marcaste activa"
-    : "✅ Sigue activo";
-
-  const textoNegar = votoActual === "negativo"
-    ? "✓ Marcaste ya pasó"
-    : "⚠️ Ya pasó / falso";
-
-  const miniBotonVoto = usuarioActual
-    ? ""
-    : `
-      <button
-        onclick="mostrarInfoLogin('votar una alerta')"
-        style="padding:8px; border:none; border-radius:8px; background:#1976d2; color:white; font-weight:800;"
-      >
-        🔐
-      </button>
-    `;
-
-  const bloqueVotos = usuarioActual && !esPremium()
-    ? `
-      <div class="votos-google">
-        <button
-          onclick="confirmarAlerta('${id}')"
-          class="btn-voto-google btn-voto-activo"
-        >
-          ${textoConfirmar}
-        </button>
-
-        <button
-          onclick="negarAlerta('${id}')"
-          class="btn-voto-google btn-voto-paso"
-        >
-          ${textoNegar}
-        </button>
-      </div>
-    `
-    : `
-      <div style="display:flex; gap:6px;">
-        <button
-          onclick="confirmarAlerta('${id}')"
-          style="flex:1; padding:8px; border:none; border-radius:8px; background:#2e7d32; color:white;"
-        >
-          ${textoConfirmar}
-        </button>
-
-        ${miniBotonVoto}
-      </div>
-
-      <div style="display:flex; gap:6px; margin-top:6px;">
-        <button
-          onclick="negarAlerta('${id}')"
-          style="flex:1; padding:8px; border:none; border-radius:8px; background:#d32f2f; color:white;"
-        >
-          ${textoNegar}
-        </button>
-
-        ${miniBotonVoto}
-      </div>
-    `;
-
-  return `
-    <div class="popup-alerta${clasePremiumPopup}${claseVistaUsuario}">
-      <strong>${escaparHtml(alerta.tipo || "Alerta")}</strong><br>
-
-      ${bloqueDetalle}
-
-      <div class="creador-alerta${clasePremiumCreador}">
-        ${
-          alerta.creadoPorFoto
-            ? `
-              <img
-                src="${escaparHtml(alerta.creadoPorFoto)}"
-                alt="Usuario creador"
-              >
-            `
-            : ""
-        }
-
-        <div class="creador-alerta-texto">
-          <span class="creado-por-label">Creado por</span>
-          <span class="creador-alerta-nombre">
-            ${escaparHtml(alerta.creadoPorNombre || "Usuario")}
-          </span>
-        </div>
-
-        ${etiquetaPremiumCreador}
-      </div>
-
-      <div style="margin:8px 0; padding:6px; border-radius:8px; background:${estado.color}; color:white;">
-        ${estado.emoji} ${estado.texto}
-      </div>
-
-      <small>✅ Sigue activo: ${confirmaciones}</small><br>
-      <small>⚠️ Ya pasó / falso: ${negativos}</small><br>
-      <small>📍 A ${distanciaTexto} de ti</small><br>
-      <small>
-        ${
-          esAlertaPermanente
-            ? "📌 Alerta permanente"
-            : `Se borra: ${vence ? vence.toLocaleTimeString() : "pronto"}`
-        }
-      </small>
-
-      <hr>
-
-      ${bloqueVotos}
-
-      <hr>
-
-      ${bloqueComentarios}
-
-      ${bloqueComentar}
-
-      ${bloqueEliminarAdmin}
-    </div>
-  `;
-}
-
-window.eliminarAlertaPermanente = function(id) {
-  if (!esAdmin()) {
-    alert("Solo un administrador puede eliminar esta alerta.");
-    return;
-  }
-
-  const confirmar = confirm(
-    "¿Eliminar esta alerta permanente?\n\nEsta acción no se puede deshacer."
-  );
-
-  if (!confirmar) return;
-
-  db.collection("alertas").doc(id).delete()
-    .then(() => {
-      alert("Alerta eliminada correctamente.");
-    })
-    .catch((error) => {
-      console.error("Error eliminando alerta:", error);
-      alert("No se pudo eliminar la alerta.");
-    });
-};
-
-async function registrarVotoUnico(id, tipoNuevo) {
-  if (!usuarioActual) {
-    window.mostrarInfoLogin("votar una alerta");
-    return;
-  }
-
-  const referenciaAlerta = db.collection("alertas").doc(id);
-  const referenciaVoto = referenciaAlerta
-    .collection("votos")
-    .doc(usuarioActual.uid);
-
-  try {
-    const resultado = await db.runTransaction(async (transaccion) => {
-      const documentoAlerta = await transaccion.get(referenciaAlerta);
-      const documentoVoto = await transaccion.get(referenciaVoto);
-
-      if (!documentoAlerta.exists) {
-        throw new Error("La alerta ya no existe.");
-      }
-
-      const datosAlerta = documentoAlerta.data();
-      const confirmacionesActuales = datosAlerta.confirmaciones || 0;
-      const negativosActuales = datosAlerta.negativos || 0;
-      const tipoAnterior = documentoVoto.exists
-        ? documentoVoto.data().tipo
-        : null;
-
-      if (tipoAnterior === tipoNuevo) {
-        return "sin-cambios";
-      }
-
-      let nuevasConfirmaciones = confirmacionesActuales;
-      let nuevosNegativos = negativosActuales;
-
-      if (tipoNuevo === "confirmar") {
-        nuevasConfirmaciones += 1;
-
-        if (tipoAnterior === "negativo") {
-          nuevosNegativos = Math.max(0, nuevosNegativos - 1);
-        }
-      } else {
-        nuevosNegativos += 1;
-
-        if (tipoAnterior === "confirmar") {
-          nuevasConfirmaciones = Math.max(
-            0,
-            nuevasConfirmaciones - 1
-          );
-        }
-      }
-
-      transaccion.update(referenciaAlerta, {
-        confirmaciones: nuevasConfirmaciones,
-        negativos: nuevosNegativos
-      });
-
-      const datosVoto = {
-        tipo: tipoNuevo,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      if (!documentoVoto.exists) {
-        datosVoto.createdAt =
-          firebase.firestore.FieldValue.serverTimestamp();
-      }
-
-      transaccion.set(
-        referenciaVoto,
-        datosVoto,
-        { merge: true }
-      );
-
-      return tipoAnterior ? "cambiado" : "nuevo";
-    });
-
-    const textoTipo = tipoNuevo === "confirmar"
-      ? "sigue activa"
-      : "ya pasó";
-
-    if (resultado === "sin-cambios") {
-      alert("Ya habías registrado este voto.");
-    } else if (resultado === "cambiado") {
-      alert(`Tu voto cambió a: ${textoTipo}.`);
-    } else {
-      alert(`Voto registrado: ${textoTipo}.`);
-    }
-  } catch (error) {
-    console.error("Error registrando voto:", error);
-    alert("No se pudo registrar el voto.");
-  }
-}
-
-window.confirmarAlerta = function(id) {
-  registrarVotoUnico(id, "confirmar");
-};
-
-window.negarAlerta = function(id) {
-  registrarVotoUnico(id, "negativo");
-};
-
-window.comentarAlerta = async function(id) {
-  if (!usuarioActual) {
-    window.mostrarInfoLogin("comentar una alerta");
-    return;
-  }
-
-  const input = document.getElementById(`comentario-${id}`);
-
-  if (!input) return;
-
-  const texto = input.value.trim();
-
-  if (texto.length < 2) {
-    alert("Escribe un comentario más claro.");
-    return;
-  }
-
-  const referenciaAlerta = db.collection("alertas").doc(id);
-  const referenciaComentario = referenciaAlerta
-    .collection("comentarios")
-    .doc();
-
-  try {
-    const lote = db.batch();
-
-    lote.set(referenciaComentario, {
-      texto: texto.slice(0, 280),
-      creadoPorUid: usuarioActual.uid,
-      creadoPorNombre: usuarioActual.displayName || "Usuario",
-      creadoPorFoto: usuarioActual.photoURL || "",
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    lote.update(referenciaAlerta, {
-      comentariosCount: firebase.firestore.FieldValue.increment(1)
-    });
-
-    await lote.commit();
-    input.value = "";
-  } catch (error) {
-    console.error("Error agregando comentario:", error);
-    alert("No se pudo agregar el comentario.");
-  }
-};
-
-function refrescarPopupAlerta(id) {
-  const alerta = alertasEnMemoria[id];
-  const marcador = marcadoresAlertas[id];
-
-  if (!alerta || !marcador) return;
-
-  const campoComentario = document.getElementById(`comentario-${id}`);
-  const estaEscribiendo =
-    campoComentario && document.activeElement === campoComentario;
-
-  if (!estaEscribiendo) {
-    marcador.setPopupContent(crearPopupAlerta(id, alerta));
-  }
-}
-
-function iniciarEscuchasDetalleAlerta(id) {
-  if (!listenersComentariosPorAlerta[id]) {
-    listenersComentariosPorAlerta[id] = db
-      .collection("alertas")
-      .doc(id)
-      .collection("comentarios")
-      .orderBy("createdAt", "desc")
-      .limit(4)
-      .onSnapshot(
-        (snapshot) => {
-          comentariosPorAlerta[id] = snapshot.docs.map((documento) => {
-            const comentario = documento.data();
-
-            return {
-              id: documento.id,
-              texto: comentario.texto || "",
-              nombre: comentario.creadoPorNombre || "Usuario",
-              foto: comentario.creadoPorFoto || "",
-              hora: comentario.createdAt || null
-            };
-          });
-
-          refrescarPopupAlerta(id);
-        },
-        (error) => {
-          console.error("Error leyendo comentarios:", error);
-          comentariosPorAlerta[id] = [];
-          refrescarPopupAlerta(id);
-        }
-      );
-  }
-
-  if (usuarioActual && !listenersVotosPorAlerta[id]) {
-    listenersVotosPorAlerta[id] = db
-      .collection("alertas")
-      .doc(id)
-      .collection("votos")
-      .doc(usuarioActual.uid)
-      .onSnapshot(
-        (documento) => {
-          votosUsuarioPorAlerta[id] = documento.exists
-            ? documento.data().tipo || null
-            : null;
-
-          refrescarPopupAlerta(id);
-        },
-        (error) => {
-          console.error("Error leyendo voto actual:", error);
-          votosUsuarioPorAlerta[id] = null;
-          refrescarPopupAlerta(id);
-        }
-      );
-  }
-}
-
-function detenerEscuchasDetalleAlerta(id) {
-  if (listenersComentariosPorAlerta[id]) {
-    listenersComentariosPorAlerta[id]();
-    delete listenersComentariosPorAlerta[id];
-  }
-
-  if (listenersVotosPorAlerta[id]) {
-    listenersVotosPorAlerta[id]();
-    delete listenersVotosPorAlerta[id];
-  }
-
-  delete votosUsuarioPorAlerta[id];
-}
-
-
-function actualizarUbicacionUsuario(posicion) {
-  const lat = posicion.coords.latitude;
-  const lng = posicion.coords.longitude;
-  const nuevaUbicacion = [lat, lng];
-
-  const ubicacionNueva = L.latLng(lat, lng);
-
-  let distanciaMovimiento = 0;
-
- if (ubicacionUsuarioActual) {
-  distanciaMovimiento = ubicacionUsuarioActual.distanceTo(ubicacionNueva);
-
-  /* Evita que pequeños saltos del GPS hagan girar el auto raro */
-  if (distanciaMovimiento >= 3) {
-    anguloAuto = calcularAnguloDireccion(
-      ubicacionUsuarioActual,
-      ubicacionNueva
-    );
-  }
-}
-
-ubicacionUsuarioActual = ubicacionNueva;
-actualizarMarcadoresPorRango();
-
-  ubicacionUsuarioActual = ubicacionNueva;
-  actualizarMarcadoresPorRango();
-
-  if (!marcadorUsuario) {
-   marcadorUsuario = L.marker(nuevaUbicacion, {
-  icon: crearIconoAuto(anguloAuto)
-})
-      .addTo(map)
-      .bindPopup('Tu ubicación');
-
-    map.setView(nuevaUbicacion, 15);
-  } else {
-    marcadorUsuario.setLatLng(nuevaUbicacion);
-    marcadorUsuario.setIcon(crearIconoAuto(anguloAuto));
-
-    if (siguiendoUsuario || distanciaMovimiento > 20) {
-      siguiendoUsuario = true;
-      map.panTo(nuevaUbicacion);
-    }
-  }
-}
-
-map.on('dragstart zoomstart', function() {
-  siguiendoUsuario = false;
-
-  clearTimeout(temporizadorReencuadre);
-
-  temporizadorReencuadre = setTimeout(() => {
-    siguiendoUsuario = true;
-
-    if (marcadorUsuario) {
-      const ubicacionActual = marcadorUsuario.getLatLng();
-      map.setView(ubicacionActual, 15);
-    }
-  }, 30000);
-});
-
-function errorUbicacion() {
-  console.log('No se pudo obtener la ubicación del usuario.');
-}
-
-navigator.geolocation.watchPosition(
-  actualizarUbicacionUsuario,
-  errorUbicacion,
-  {
-    enableHighAccuracy: true,
-    maximumAge: 0,
-    timeout: 10000
-  }
-);
-
-map.on('click', function(e) {
-  ubicacionSeleccionada = e.latlng;
-
-  if (marcadorSeleccion) {
-    marcadorSeleccion.setLatLng(e.latlng);
-  } else {
-    marcadorSeleccion = L.marker(e.latlng)
-      .addTo(map)
-      .bindPopup('Punto seleccionado para alerta');
-  }
-
-  marcadorSeleccion.openPopup();
-});
-
-function configurarFormularioAlertaSegunPermiso() {
-  const tipo = document.getElementById('tipo');
-  const descripcion = document.getElementById('descripcion');
-
-    const opcionPermanente = document.getElementById('opcion-alerta-permanente');
-  const alertaPermanente = document.getElementById('alerta-permanente');
-
-  if (esAdmin()) {
-    opcionPermanente.classList.remove('oculto');
-  } else {
-    opcionPermanente.classList.add('oculto');
-    alertaPermanente.checked = false;
-  }
-
-  let filaPremium = document.getElementById('fila-detalle-premium');
-
-  if (!filaPremium) {
-    filaPremium = document.createElement('div');
-    filaPremium.id = 'fila-detalle-premium';
-
-    filaPremium.innerHTML = `
-      <span style="font-size:12px; color:#666;">
-        🔒 Detalle completo
-      </span>
-
-      <button
-        id="btn-detalle-premium"
-        type="button"
-        style="
-          margin-left:auto;
-          border:none;
-          border-radius:8px;
-          padding:6px 9px;
-          background:#ffb300;
-          color:#111;
-          font-weight:800;
-          cursor:pointer;
-        "
-      >
-        ⭐ Premium
-      </button>
-    `;
-
-    descripcion.insertAdjacentElement('afterend', filaPremium);
-
-    document.getElementById('btn-detalle-premium').addEventListener('click', function() {
-      alert('Agregar detalles a una alerta es una función Premium.');
-    });
-  }
-
-  if (esPremium()) {
-    Array.from(tipo.options).forEach((opcion) => {
-      opcion.hidden = false;
-      opcion.disabled = false;
-    });
-
-    descripcion.value = '';
-    descripcion.readOnly = false;
-    descripcion.disabled = false;
-    descripcion.placeholder = 'Describe brevemente qué está pasando...';
-    descripcion.style.display = 'block';
-    descripcion.style.background = '';
-    descripcion.style.cursor = '';
-    descripcion.style.opacity = '';
-    descripcion.onfocus = null;
-
-    filaPremium.style.display = 'none';
-    return;
-  }
-
-  Array.from(tipo.options).forEach((opcion) => {
-    const esAtunes = opcion.value === 'Atunes';
-
-    opcion.hidden = !esAtunes;
-    opcion.disabled = !esAtunes;
-  });
-
-  tipo.value = 'Atunes';
-
-  descripcion.value = '';
-  descripcion.disabled = false;
-  descripcion.readOnly = true;
-  descripcion.placeholder = '🔒 Detalle completo disponible con Premium';
-  descripcion.style.display = 'block';
-  descripcion.style.background = '#f1f3f5';
-  descripcion.style.cursor = 'pointer';
-  descripcion.style.opacity = '0.9';
-
-  descripcion.onfocus = function() {
-    this.blur();
-    alert('Agregar detalles a una alerta es una función Premium.');
-  };
-
-  filaPremium.style.display = 'flex';
-  filaPremium.style.alignItems = 'center';
-  filaPremium.style.gap = '8px';
-  filaPremium.style.marginTop = '6px';
-}
-
-document.getElementById('btn-alerta').addEventListener('click', function() {
-  if (!usuarioActual) {
-    alert('Debes iniciar sesión con Google para crear una alerta.');
-    return;
-  }
-
-  configurarFormularioAlertaSegunPermiso();
-
-  document.getElementById('panel-alerta').classList.remove('oculto');
-});
-
-document.getElementById('cerrar').addEventListener('click', function() {
-  document.getElementById('panel-alerta').classList.add('oculto');
-});
-
-document.getElementById('btn-login-google').addEventListener('click', function() {
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-    .then(() => {
-      return auth.signInWithPopup(providerGoogle);
-    })
-    .then((resultado) => {
-      if (resultado && resultado.user) {
-        crearOActualizarUsuario(resultado.user);
-      }
-    })
-    .catch((error) => {
-      console.error("Error iniciando sesión con popup:", error);
-      alert("No se pudo iniciar sesión con Google.");
-    });
-});
-
-auth.getRedirectResult()
-  .then((resultado) => {
-    if (resultado.user) {
-      crearOActualizarUsuario(resultado.user);
-      console.log("Login con Google completado por redirect");
-    }
-  })
-  .catch((error) => {
-    console.error("Error en redirect Google:", error);
-    alert("No se pudo iniciar sesión con Google.");
-  });
-
-document.getElementById('btn-logout').addEventListener('click', function() {
-  auth.signOut()
-    .then(() => {
-      console.log("Sesión cerrada");
-    })
-    .catch((error) => {
-      console.error("Error cerrando sesión:", error);
-    });
-});
-
-function crearOActualizarUsuario(usuario) {
-  if (!usuario) return;
-
-  const referenciaUsuario = db.collection("usuarios").doc(usuario.uid);
-
-  referenciaUsuario.get().then((doc) => {
-    if (!doc.exists) {
-      referenciaUsuario.set({
-        nombre: usuario.displayName || "",
-        email: usuario.email || "",
-        foto: usuario.photoURL || "",
-        premium: false,
-        rol: "usuario",
-        estado: "activo",
-        vencePremium: null,
-        creado: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    } else {
-      referenciaUsuario.update({
-        nombre: usuario.displayName || "",
-        email: usuario.email || "",
-        foto: usuario.photoURL || ""
-      });
-    }
-  });
-}
-
-auth.onAuthStateChanged(function(usuario) {
-  const btnLogin = document.getElementById('btn-login-google');
-  const usuarioInfo = document.getElementById('usuario-info');
-  const usuarioFoto = document.getElementById('usuario-foto');
-  const usuarioNombre = document.getElementById('usuario-nombre');
-
-  if (usuario) {
-    usuarioActual = usuario;
-    perfilUsuario = null;
-actualizarMarcadoresPorRango();
-
-    crearOActualizarUsuario(usuario);
-
-    db.collection("usuarios").doc(usuario.uid).get()
-      .then((doc) => {
-  if (doc.exists) {
-    perfilUsuario = doc.data();
-    console.log("Perfil cargado:", perfilUsuario);
-  } else {
-    perfilUsuario = {
-      premium: false,
-      colorAuto: "rojo",
-      rol: "usuario",
-      estado: "activo"
-    };
-  }
-
-  actualizarMarcadoresPorRango();
-  actualizarEstiloPremiumUsuario();
-  actualizarIconoAuto();
-});
-
-    btnLogin.classList.add('oculto');
-    usuarioInfo.classList.remove('oculto');
-
-    usuarioFoto.src = usuario.photoURL || "";
-    usuarioNombre.textContent = usuario.displayName || "Usuario";
-  } else {
-    usuarioActual = null;
-    perfilUsuario = null;
-    actualizarMarcadoresPorRango();
-    actualizarEstiloPremiumUsuario();
-
-    btnLogin.classList.remove('oculto');
-    usuarioInfo.classList.add('oculto');
-
-    usuarioFoto.src = "";
-    usuarioNombre.textContent = "";
-  }
-});
-
-document.getElementById('btn-centrar').addEventListener('click', function() {
-  siguiendoUsuario = true;
-
-  if (marcadorUsuario) {
-    const ubicacionActual = marcadorUsuario.getLatLng();
-    map.setView(ubicacionActual, 15);
-  } else {
-    alert('Todavía no se detectó tu ubicación.');
-  }
-});
-
-document.getElementById('publicar').addEventListener('click', function() {
-  const tipo = document.getElementById('tipo').value;
-  const descripcion = document.getElementById('descripcion').value.trim();
-
-  if (!ubicacionSeleccionada) {
-    alert('Primero toca el mapa donde ocurrió la alerta.');
-    return;
-  }
-
- if (esPremium() && descripcion.length < 5) {
-  alert('Escribe una descripción un poco más clara.');
-  return;
-}
-
-  const latAlerta = ubicacionSeleccionada.lat;
-  const lngAlerta = ubicacionSeleccionada.lng;
-
-  const ahora = new Date();
-  const vence = new Date(ahora.getTime() + 2 * 60 * 60 * 1000);
-  const alertaPermanente =
-  esAdmin() &&
-  document.getElementById('alerta-permanente').checked;
-
-  db.collection("alertas").add({
-  tipo: tipo,
- descripcion: esPremium() ? descripcion : "Alerta rápida",
-  lat: latAlerta,
-  lng: lngAlerta,
-  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-  expiresAt: alertaPermanente ? null : vence,
-permanente: alertaPermanente,
-  comentariosCount: 0,
-  confirmaciones: 0,
-  negativos: 0,
-
-  creadoPorUid: usuarioActual ? usuarioActual.uid : null,
-  creadoPorNombre: usuarioActual ? usuarioActual.displayName : "Usuario",
-  creadoPorFoto: usuarioActual ? usuarioActual.photoURL : "",
-creadorPremium: esPremium(),
-creadoPorAdmin: esAdmin()
-})
-
-  .then(() => {
-    console.log("Alerta guardada en Firebase");
-
-    document.getElementById('descripcion').value = '';
-    document.getElementById('alerta-permanente').checked = false;
-    document.getElementById('panel-alerta').classList.add('oculto');
-
-    if (marcadorSeleccion) {
-      map.removeLayer(marcadorSeleccion);
-      marcadorSeleccion = null;
+document.addEventListener("DOMContentLoaded", function() {
+
+    cargarDatosPartidoFirebase();
+    cargarPichangasFirebase();
+    cargarJugadoresFirebase();
+
+    const checkPerfil = document.getElementById("usarPerfilLigaDorada");
+    const campoWhatsapp = document.getElementById("whatsapp");
+
+    if (checkPerfil) {
+        checkPerfil.addEventListener("change", function() {
+            actualizarModoPerfil();
+            mostrarPerfilEncontrado();
+        });
     }
 
-    ubicacionSeleccionada = null;
-  })
-  .catch((error) => {
-    console.error("Error guardando alerta:", error);
-    alert("No se pudo guardar la alerta.");
-  });
-});
-
-function obtenerLimiteRangoAlertas() {
-  if (esPremium()) {
-    return Infinity;
-  }
-
-  if (usuarioActual) {
-    return 5000;
-  }
-
-  return 2000;
-}
-
-function quitarMarcadorAlerta(id) {
-  if (alertaPopupAbiertaId === id) {
-    alertaPopupAbiertaId = null;
-    detenerEscuchasDetalleAlerta(id);
-  }
-
-  if (marcadoresAlertas[id]) {
-    map.removeLayer(marcadoresAlertas[id]);
-    delete marcadoresAlertas[id];
-  }
-}
-
-function alertaEstaDentroDelRango(alerta) {
-  if (!ubicacionUsuarioActual) {
-    return false;
-  }
-
-  if (esPremium()) {
-    return true;
-  }
-
-  const distancia = calcularDistanciaMetros(
-    ubicacionUsuarioActual.lat,
-    ubicacionUsuarioActual.lng,
-    alerta.lat,
-    alerta.lng
-  );
-
-  return distancia <= obtenerLimiteRangoAlertas();
-}
-
-function actualizarMarcadoresPorRango() {
-  Object.entries(alertasEnMemoria).forEach(([id, alerta]) => {
-    dibujarAlerta(id, alerta);
-  });
-}
-
-function dibujarAlerta(id, alerta) {
-  if (typeof alerta.lat !== "number" || typeof alerta.lng !== "number") {
-    quitarMarcadorAlerta(id);
-    return;
-  }
-
-  const vence = obtenerFechaVencimiento(alerta);
-  const esAlertaPermanente = alerta.permanente === true;
-
-  if (vence && vence <= new Date()) {
-    quitarMarcadorAlerta(id);
-    return;
-  }
-
-  if (!alertaEstaDentroDelRango(alerta)) {
-    quitarMarcadorAlerta(id);
-    return;
-  }
-
-  const confirmaciones = alerta.confirmaciones || 0;
-  const negativos = alerta.negativos || 0;
-  const icono = crearIconoAlerta(alerta.tipo, confirmaciones, negativos);
-
-  if (marcadoresAlertas[id]) {
-  marcadoresAlertas[id].setIcon(icono);
-
-  const campoComentario = document.getElementById(`comentario-${id}`);
-  const estaEscribiendo =
-    campoComentario && document.activeElement === campoComentario;
-
-  if (!estaEscribiendo) {
-    marcadoresAlertas[id].setPopupContent(crearPopupAlerta(id, alerta));
-  }
-
-  return;
-}
-
-  const marcador = L.marker([alerta.lat, alerta.lng], { icon: icono })
-    .addTo(map)
-    .bindPopup(crearPopupAlerta(id, alerta));
-
-  marcador.on("popupopen", () => {
-    alertaPopupAbiertaId = id;
-    iniciarEscuchasDetalleAlerta(id);
-  });
-
-  marcador.on("popupclose", () => {
-    if (alertaPopupAbiertaId === id) {
-      alertaPopupAbiertaId = null;
+    if (campoWhatsapp) {
+        campoWhatsapp.addEventListener("input", mostrarPerfilEncontrado);
     }
 
-    detenerEscuchasDetalleAlerta(id);
-  });
+    actualizarModoPerfil();
+});
 
-  marcadoresAlertas[id] = marcador;
+function reservarCupo() {
+    const formulario = document.getElementById("formulario");
 
-  if (vence) {
-    const tiempoRestante = vence.getTime() - Date.now();
+    formulario.style.display = "block";
 
     setTimeout(() => {
-      if (marcadoresAlertas[id]) {
-        map.removeLayer(marcadoresAlertas[id]);
-        delete marcadoresAlertas[id];
-      }
-    }, tiempoRestante);
-  }
+        formulario.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }, 100);
 }
 
-db.collection("alertas").onSnapshot((snapshot) => {
-  snapshot.docChanges().forEach((change) => {
-    const id = change.doc.id;
+async function enviarReserva() {
 
-    if (change.type === "removed") {
-      delete alertasEnMemoria[id];
-      quitarMarcadorAlerta(id);
-      return;
+    if (inscritos >= 18) {
+        alert("La pichanga ya está llena");
+        return;
     }
 
-    const alerta = change.doc.data();
+    let nombre = document.getElementById("nombre").value.trim();
+    let edad = document.getElementById("edad").value.trim();
+    let distrito = document.getElementById("distrito").value.trim();
+    let correo = document.getElementById("correo").value.trim();
+    let whatsapp = document.getElementById("whatsapp").value.trim();
+    let posicion = document.getElementById("posicion").value;
+    let pieDominante = document.getElementById("pieDominante").value;
+    let equipo = document.getElementById("equipo").value;
+    let usarPerfil = document.getElementById("usarPerfilLigaDorada").checked;
 
-    alertasEnMemoria[id] = alerta;
-    dibujarAlerta(id, alerta);
-  });
-});
-
-
-let wakeLock = null;
-
-async function activarPantallaSiempreEncendida() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      console.log('Pantalla siempre encendida activada');
-    }
-  } catch (error) {
-    console.log('No se pudo activar pantalla siempre encendida:', error);
-  }
+    if (!usarPerfil && nombre === "") {
+    alert("Por favor ingresa tu nombre");
+    return;
 }
 
-document.addEventListener('visibilitychange', async () => {
-  if (wakeLock !== null && document.visibilityState === 'visible') {
-    await activarPantallaSiempreEncendida();
-  }
-});
-
-activarPantallaSiempreEncendida();
-
-/* =========================================
-   MENÚ DE USUARIO Y PLANES
-   ========================================= */
-
-const btnMenuUsuario = document.getElementById("btn-menu-usuario");
-const btnMenuVisitante = document.getElementById("btn-menu-visitante");
-const overlayMenu = document.getElementById("overlay-menu");
-const menuUsuarioPanel = document.getElementById("menu-usuario-panel");
-const panelPlanes = document.getElementById("panel-planes");
-const btnCerrarMenu = document.getElementById("btn-cerrar-menu");
-const btnMenuPlanes = document.getElementById("btn-menu-planes");
-const btnVolverMenu = document.getElementById("btn-volver-menu");
-const btnCerrarPlanes = document.getElementById("btn-cerrar-planes");
-const btnActivarPremium = document.getElementById("btn-activar-premium");
-
-const selectorColorAuto = document.getElementById("selector-color-auto");
-const estadoColorAuto = document.getElementById("estado-color-auto");
-const textoColorAuto = document.getElementById("texto-color-auto");
-const botonesColorAuto = document.querySelectorAll(".boton-color-auto");
-
-function actualizarSelectorColorAuto() {
-  if (!selectorColorAuto) return;
-
-  const puedeCambiarColor = !!usuarioActual && esPremium();
-  const colorActual = obtenerColorAutoActual();
-
-  selectorColorAuto.classList.toggle(
-    "selector-color-auto-bloqueado",
-    !puedeCambiarColor
-  );
-
-  botonesColorAuto.forEach((boton) => {
-    const colorBoton = boton.dataset.color;
-    const estaSeleccionado = puedeCambiarColor && colorBoton === colorActual;
-
-    boton.classList.toggle("seleccionado", estaSeleccionado);
-    boton.setAttribute("aria-pressed", estaSeleccionado ? "true" : "false");
-  });
-
-  if (puedeCambiarColor) {
-    estadoColorAuto.textContent = "⭐ PREMIUM";
-    textoColorAuto.textContent =
-      `Color actual: ${nombresColorAuto[colorActual] || "Rojo"}`;
-  } else {
-    estadoColorAuto.textContent = "🔒 Premium";
-    textoColorAuto.textContent =
-      "Personaliza tu auto GPS con Premium";
-  }
+    if (!usarPerfil && correo === "") {
+    alert("Por favor ingresa tu correo");
+    return;
 }
 
-botonesColorAuto.forEach((boton) => {
-  boton.addEventListener("click", function() {
-    const colorElegido = this.dataset.color;
+    let correoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo);
 
-    if (!usuarioActual) {
-      mostrarInfoLogin("cambiar el color de tu auto");
-      return;
+   if (!usarPerfil && !validarCorreo(correo)) {
+    alert("Ingresa un correo válido");
+    return;
+}
+
+    if (whatsapp === "") {
+        alert("Por favor ingresa tu WhatsApp");
+        return;
     }
 
-    if (!esPremium()) {
-      mostrarInfoPremium("Cambiar el color de tu auto GPS");
-      return;
+    let whatsappValido = /^[0-9]{9}$/.test(whatsapp);
+
+    if (!whatsappValido) {
+        alert("El WhatsApp debe tener 9 números");
+        return;
     }
 
-    if (!autosPorColor[colorElegido]) return;
+    if (!whatsapp.startsWith("9")) {
+        alert("El WhatsApp debe empezar con 9");
+        return;
+    }
 
-    db.collection("usuarios").doc(usuarioActual.uid).set(
-      {
-        colorAuto: colorElegido
-      },
-      { merge: true }
-    )
-    .then(() => {
-      perfilUsuario = {
-        ...perfilUsuario,
-        colorAuto: colorElegido
-      };
-
-      actualizarIconoAuto();
-      actualizarSelectorColorAuto();
-    })
-    .catch((error) => {
-      console.error("Error guardando color del auto:", error);
-      alert("No se pudo guardar el color del auto.");
+    let whatsappRepetido = jugadores.some(function(jugador) {
+        return jugador.whatsapp === whatsapp;
     });
-  });
-});
 
-function cerrarPanelesCuenta() {
-  overlayMenu.classList.add("oculto");
-  menuUsuarioPanel.classList.add("oculto");
-  panelPlanes.classList.add("oculto");
+    if (whatsappRepetido) {
+        alert("Este WhatsApp ya está inscrito en esta pichanga");
+        return;
+    }
 
-  menuUsuarioPanel.setAttribute("aria-hidden", "true");
-  panelPlanes.setAttribute("aria-hidden", "true");
+    let cantidadEquipoA = jugadores.filter(function(jugador, index) {
+        return obtenerEquipo(jugador, index) === "A";
+    }).length;
 
-  btnMenuUsuario.setAttribute("aria-expanded", "false");
-}
+    let cantidadEquipoB = jugadores.filter(function(jugador, index) {
+        return obtenerEquipo(jugador, index) === "B";
+    }).length;
 
-function abrirMenuUsuario() {
-      actualizarSelectorColorAuto();
+    if (equipo === "A" && cantidadEquipoA >= 9) {
+        alert("El Equipo A ya está lleno");
+        return;
+    }
 
-  overlayMenu.classList.remove("oculto");
-  panelPlanes.classList.add("oculto");
-  menuUsuarioPanel.classList.remove("oculto");
+    if (equipo === "B" && cantidadEquipoB >= 9) {
+        alert("El Equipo B ya está lleno");
+        return;
+    }
 
-  panelPlanes.setAttribute("aria-hidden", "true");
-  menuUsuarioPanel.setAttribute("aria-hidden", "false");
-
-  btnMenuUsuario.setAttribute("aria-expanded", "true");
-}
-
-function abrirPanelPlanes() {
-  overlayMenu.classList.remove("oculto");
-  menuUsuarioPanel.classList.add("oculto");
-  panelPlanes.classList.remove("oculto");
-
-  menuUsuarioPanel.setAttribute("aria-hidden", "true");
-  panelPlanes.setAttribute("aria-hidden", "false");
-}
-
-btnMenuUsuario.addEventListener("click", abrirMenuUsuario);
-btnMenuVisitante.addEventListener("click", abrirMenuUsuario);
-
-btnCerrarMenu.addEventListener("click", cerrarPanelesCuenta);
-btnCerrarPlanes.addEventListener("click", cerrarPanelesCuenta);
-
-overlayMenu.addEventListener("click", cerrarPanelesCuenta);
-
-btnMenuPlanes.addEventListener("click", abrirPanelPlanes);
-
-btnVolverMenu.addEventListener("click", abrirMenuUsuario);
-
-btnActivarPremium.addEventListener("click", function() {
-  if (!usuarioActual) {
-    alert("Inicia sesión con Google para solicitar Premium.");
+    if (!usarPerfil && pieDominante === "") {
+    alert("Selecciona tu pie dominante");
     return;
-  }
+}
 
-  if (esPremium()) {
-    alert("Tu cuenta ya tiene Premium activo.");
+let perfilPrevio = await cargarPerfilJugadorFirebase(whatsapp);
+
+if (usarPerfil && !perfilPrevio) {
+    alert("No encontramos un perfil con ese WhatsApp. Regístrate de forma normal.");
     return;
-  }
+}
 
-  const nombre = usuarioActual.displayName || "Usuario";
-  const correo = usuarioActual.email || "No disponible";
+if (usarPerfil && perfilPrevio.nombre === "") {
+    alert("Tu perfil existe, pero está incompleto. Contacta al administrador para actualizar tus datos.");
+    return;
+}
 
-  const mensaje = [
-    "Hola, quiero solicitar Alerta Lima Premium.",
-    "",
-    `Nombre: ${nombre}`,
-    `Correo de mi cuenta: ${correo}`,
-    "",
-    "Me interesa activar el plan Premium.",
-   "Opciones: S/4.99 mensual o S/29.90 anual (50% OFF)."
-  ].join("\n");
+if (!usarPerfil && perfilPrevio) {
+    alert("Este WhatsApp ya tiene un perfil Liga Dorada. Marca la opción 'Usar mi perfil Liga Dorada' para inscribirte.");
+    return;
+}
 
-  const urlWhatsApp =
-    `https://wa.me/51978206205?text=${encodeURIComponent(mensaje)}`;
+    let nuevoJugador = {
+    nombre: usarPerfil && perfilPrevio ? perfilPrevio.nombre : nombre,
+    edad: edad,
+    distrito: distrito,
+    correo: usarPerfil && perfilPrevio ? perfilPrevio.correo : correo,
+    whatsapp: whatsapp,
+    jugadorId: usarPerfil && perfilPrevio ? perfilPrevio.jugadorId : whatsapp,
+    posicion: posicion,
+    equipo: equipo,
+    partidoId: localStorage.getItem("pichangaSeleccionadaId") || partidoId,
+    nivel: perfilPrevio ? perfilPrevio.nivel : 1,
+    pieDominante: usarPerfil && perfilPrevio ? perfilPrevio.pieDominante : pieDominante,
+    partidosJugados: perfilPrevio ? perfilPrevio.partidosJugados : 0,
+    goles: perfilPrevio ? perfilPrevio.goles : 0,
+    puntos: perfilPrevio ? perfilPrevio.puntos : 0,
+    estado: "Pendiente de pago"
+};
+    jugadores.push(nuevoJugador);
 
-  window.location.href = urlWhatsApp;
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    console.log("NUEVO JUGADOR ANTES DE GUARDAR:", nuevoJugador);
+console.log("ID DE PICHANGA EN LOCALSTORAGE:", localStorage.getItem("pichangaSeleccionadaId"));
+console.log("PARTIDO ID GLOBAL:", partidoId);
+    
+    await guardarJugadorFirebase(nuevoJugador);
+
+    await cargarJugadoresFirebase();
+await cargarPichangasFirebase();
+
+const pichangaActualId = localStorage.getItem("pichangaSeleccionadaId");
+
+if (pichangaActualId) {
+    verDetallePichanga(pichangaActualId);
+}
+
+if (!usarPerfil) {
+    await guardarPerfilJugadorFirebase(nuevoJugador);
+}
+
+    inscritos = jugadores.length;
+
+    document.getElementById("contador-inscritos").textContent = inscritos;
+
+    localStorage.setItem("inscritos", inscritos);
+
+    mostrarJugadores();
+
+    actualizarContadoresEquipos();
+
+    actualizarResumenPichanga();
+
+    document.getElementById("nombre").value = "";
+    document.getElementById("correo").value = "";
+    document.getElementById("whatsapp").value = "";
+    document.getElementById("posicion").value = "Arquero";
+    document.getElementById("equipo").value = "A";
+
+    const checkPerfil = document.getElementById("usarPerfilLigaDorada");
+const mensajePerfil = document.getElementById("mensajePerfilEncontrado");
+
+if (checkPerfil) {
+    checkPerfil.checked = false;
+}
+
+if (mensajePerfil) {
+    mensajePerfil.innerHTML = "";
+}
+
+actualizarModoPerfil();
+
+    alert("Reserva registrada correctamente");
+    mostrarConfirmacionReserva();
+
+    actualizarBotonEnviar();
+}
+
+function obtenerEquipo(jugador, index) {
+
+    if (jugador.equipo) {
+        return jugador.equipo;
+    }
+
+    if (index < 9) {
+        return "A";
+    } else {
+        return "B";
+    }
+}
+
+function mostrarJugadores() {
+
+    let listaEquipoA = document.getElementById("lista-equipo-a");
+    let listaEquipoB = document.getElementById("lista-equipo-b");
+
+    listaEquipoA.innerHTML = "";
+    listaEquipoB.innerHTML = "";
+
+    jugadores.forEach(function(jugador, index) {
+
+    let nuevoJugador = document.createElement("li");
+
+    let estado = jugador.estado || "Pendiente de pago";
+    let equipo = obtenerEquipo(jugador, index);
+    let nivel = jugador.nivel || 1;
+    let estrellas = nivel + "⭐";
+
+    let resumenJugador = document.createElement("div");
+
+resumenJugador.textContent = jugador.nombre + " - " + jugador.posicion + " - " + estrellas + " - Pie: " + jugador.pieDominante + " - " + estado;
+
+nuevoJugador.appendChild(resumenJugador);
+
+let botonVerEstadisticas = document.createElement("button");
+
+botonVerEstadisticas.textContent = "Ver estadísticas";
+
+botonVerEstadisticas.classList.add("btn-mover");
+
+let panelEstadisticas = document.createElement("div");
+
+panelEstadisticas.style.display = "none";
+
+panelEstadisticas.innerHTML =
+    "<strong>Estadísticas del jugador</strong><br>" +
+    "PT: " + (jugador.partidosJugados || 0) + "<br>" +
+    "Goles: " + (jugador.goles || 0) + "<br>" +
+    "Puntos: " + (jugador.puntos || 0) + "<br>" +
+    "Nivel: " + estrellas + "<br>" +
+    "Pie dominante: " + jugador.pieDominante + "<br>" +
+    "ID jugador: " + (jugador.jugadorId || jugador.whatsapp) + "<br>" +
+    "WhatsApp: " + jugador.whatsapp + "<br>" +
+    "Correo: " + jugador.correo;
+
+botonVerEstadisticas.onclick = function() {
+
+    if (panelEstadisticas.style.display === "none") {
+        panelEstadisticas.style.display = "block";
+        botonVerEstadisticas.textContent = "Ocultar estadísticas";
+    } else {
+        panelEstadisticas.style.display = "none";
+        botonVerEstadisticas.textContent = "Ver estadísticas";
+    }
+};
+
+nuevoJugador.appendChild(botonVerEstadisticas);
+
+nuevoJugador.appendChild(panelEstadisticas);
+
+
+    if (adminActivo) {
+
+        if (estado === "Pendiente de pago") {
+
+            let botonConfirmar = document.createElement("button");
+
+            botonConfirmar.textContent = "Confirmar pago ✅";
+
+            botonConfirmar.classList.add("btn-confirmar");
+
+            botonConfirmar.onclick = function() {
+                confirmarPago(index);
+            };
+
+            nuevoJugador.appendChild(botonConfirmar);
+        }
+
+        let botonMover = document.createElement("button");
+
+        botonMover.textContent = "Mover ↔️";
+
+        botonMover.classList.add("btn-mover");
+
+        botonMover.onclick = function() {
+            moverEquipo(index);
+        };
+
+        nuevoJugador.appendChild(botonMover);
+
+        let botonBajarNivel = document.createElement("button");
+
+        botonBajarNivel.textContent = "- Nivel ⭐";
+
+        botonBajarNivel.classList.add("btn-mover");
+
+        botonBajarNivel.onclick = function() {
+            cambiarNivel(index, -1);
+        };
+
+        nuevoJugador.appendChild(botonBajarNivel);
+
+        let botonSubirNivel = document.createElement("button");
+
+        botonSubirNivel.textContent = "+ Nivel ⭐";
+
+        botonSubirNivel.classList.add("btn-mover");
+
+        botonSubirNivel.onclick = function() {
+            cambiarNivel(index, 1);
+        };
+
+        nuevoJugador.appendChild(botonSubirNivel);
+
+        let botonBajarGol = document.createElement("button");
+
+botonBajarGol.textContent = "- Gol ⚽";
+
+botonBajarGol.classList.add("btn-mover");
+
+botonBajarGol.onclick = function() {
+    cambiarGoles(index, -1);
+};
+
+nuevoJugador.appendChild(botonBajarGol);
+
+let botonSubirGol = document.createElement("button");
+
+botonSubirGol.textContent = "+ Gol ⚽";
+
+botonSubirGol.classList.add("btn-mover");
+
+botonSubirGol.onclick = function() {
+    cambiarGoles(index, 1);
+};
+
+nuevoJugador.appendChild(botonSubirGol);
+
+let botonBajarPT = document.createElement("button");
+
+botonBajarPT.textContent = "- PT";
+
+botonBajarPT.classList.add("btn-mover");
+
+botonBajarPT.onclick = function() {
+    cambiarPT(index, -1);
+};
+
+nuevoJugador.appendChild(botonBajarPT);
+
+let botonSubirPT = document.createElement("button");
+
+botonSubirPT.textContent = "+ PT";
+
+botonSubirPT.classList.add("btn-mover");
+
+botonSubirPT.onclick = function() {
+    cambiarPT(index, 1);
+};
+
+nuevoJugador.appendChild(botonSubirPT);
+
+let botonBajarPunto = document.createElement("button");
+
+botonBajarPunto.textContent = "- Punto";
+
+botonBajarPunto.classList.add("btn-mover");
+
+botonBajarPunto.onclick = function() {
+    cambiarPuntos(index, -1);
+};
+
+nuevoJugador.appendChild(botonBajarPunto);
+
+let botonSubirPunto = document.createElement("button");
+
+botonSubirPunto.textContent = "+ Punto";
+
+botonSubirPunto.classList.add("btn-mover");
+
+botonSubirPunto.onclick = function() {
+    cambiarPuntos(index, 1);
+};
+
+nuevoJugador.appendChild(botonSubirPunto);
+
+        let botonEliminar = document.createElement("button");
+
+        botonEliminar.textContent = "🗑️";
+
+        botonEliminar.classList.add("btn-eliminar");
+
+        botonEliminar.onclick = function() {
+            eliminarJugador(index);
+        };
+
+        nuevoJugador.appendChild(botonEliminar);
+    }
+
+    if (equipo === "A") {
+        listaEquipoA.appendChild(nuevoJugador);
+    } else {
+        listaEquipoB.appendChild(nuevoJugador);
+    }
+});
+}
+
+async function confirmarPago(index) {
+
+    jugadores[index].estado = "Confirmado ✅";
+
+    await actualizarEstadoFirebase(jugadores[index]);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+
+    actualizarResumenPichanga();
+
+    alert("Pago confirmado correctamente");
+}
+
+async function eliminarJugador(index) {
+
+    let confirmar = confirm("¿Seguro que quieres eliminar este inscrito?");
+
+    if (confirmar === false) {
+        return;
+    }
+
+    await eliminarJugadorFirebase(jugadores[index]);
+
+    jugadores.splice(index, 1);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    inscritos = jugadores.length;
+
+    document.getElementById("contador-inscritos").textContent = inscritos;
+
+    localStorage.setItem("inscritos", inscritos);
+
+    mostrarJugadores();
+
+    actualizarContadoresEquipos();
+
+    actualizarResumenPichanga();
+
+    actualizarBotonEnviar();
+}
+
+function actualizarBotonEnviar() {
+
+    let boton = document.getElementById("btn-enviar");
+
+    if (inscritos >= 18) {
+        boton.disabled = true;
+        boton.textContent = "Pichanga llena";
+    } else {
+        boton.disabled = false;
+        boton.textContent = "Enviar";
+    }
+}
+
+async function moverEquipo(index) {
+
+    let equipoActual = obtenerEquipo(jugadores[index], index);
+
+    let nuevoEquipo;
+
+    if (equipoActual === "A") {
+        nuevoEquipo = "B";
+    } else {
+        nuevoEquipo = "A";
+    }
+
+    let cantidadNuevoEquipo = jugadores.filter(function(jugador, i) {
+        return obtenerEquipo(jugador, i) === nuevoEquipo;
+    }).length;
+
+    if (cantidadNuevoEquipo >= 9) {
+        alert("No puedes moverlo. El otro equipo ya está lleno.");
+        return;
+    }
+
+    jugadores[index].equipo = nuevoEquipo;
+
+    await actualizarEquipoFirebase(jugadores[index]);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+
+    actualizarContadoresEquipos();
+}
+
+function actualizarContadoresEquipos() {
+
+    let cantidadEquipoA = jugadores.filter(function(jugador, index) {
+        return obtenerEquipo(jugador, index) === "A";
+    }).length;
+
+    let cantidadEquipoB = jugadores.filter(function(jugador, index) {
+        return obtenerEquipo(jugador, index) === "B";
+    }).length;
+
+    document.getElementById("contador-equipo-a").textContent = cantidadEquipoA;
+    document.getElementById("contador-equipo-b").textContent = cantidadEquipoB;
+}
+
+function compartirEquipos() {
+
+    let equipoA = jugadores.filter(function(jugador, index) {
+        return obtenerEquipo(jugador, index) === "A";
+    });
+
+    let equipoB = jugadores.filter(function(jugador, index) {
+        return obtenerEquipo(jugador, index) === "B";
+    });
+
+    let mensaje = "🏆 Liga Dorada%0A%0A";
+    mensaje += "⚽ " + datosPartido.modalidad + "%0A";
+    mensaje += "📍 " + datosPartido.cancha + "%0A";
+    mensaje += "🕐 " + datosPartido.hora + "%0A";
+    mensaje += "💰 " + datosPartido.precio + "%0A%0A";
+
+    mensaje += "🟡 Equipo A%0A";
+
+    equipoA.forEach(function(jugador, index) {
+        mensaje += (index + 1) + ". " + jugador.nombre + " - " + jugador.posicion + "%0A";
+    });
+
+    mensaje += "%0A⚫ Equipo B%0A";
+
+    equipoB.forEach(function(jugador, index) {
+        mensaje += (index + 1) + ". " + jugador.nombre + " - " + jugador.posicion + "%0A";
+    });
+
+    mensaje += "%0ANos vemos en la cancha ⚽🔥";
+
+    window.open("https://wa.me/?text=" + mensaje, "_blank");
+}
+
+async function reiniciarPichanga() {
+
+    let confirmar = confirm("¿Seguro que quieres borrar todos los inscritos de esta pichanga?");
+
+    if (confirmar === false) {
+        return;
+    }
+
+    await guardarHistorialPichangaFirebase();
+    await eliminarTodosJugadoresFirebase();
+
+    jugadores = [];
+    inscritos = 0;
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+    localStorage.setItem("inscritos", inscritos);
+
+    document.getElementById("contador-inscritos").textContent = inscritos;
+
+    mostrarJugadores();
+
+    actualizarContadoresEquipos();
+
+    actualizarBotonEnviar();
+
+    actualizarResumenPichanga();
+
+    alert("Pichanga reiniciada correctamente");
+}
+
+function actualizarResumenPichanga() {
+
+    let confirmados = jugadores.filter(function(jugador) {
+        return jugador.estado === "Confirmado ✅";
+    }).length;
+
+    let pendientes = jugadores.filter(function(jugador) {
+        return jugador.estado !== "Confirmado ✅";
+    }).length;
+
+    let libres = 18 - jugadores.length;
+
+    document.getElementById("contador-confirmados").textContent = confirmados;
+    document.getElementById("contador-pendientes").textContent = pendientes;
+    document.getElementById("contador-libres").textContent = libres;
+}
+
+function activarAdmin() {
+
+    if (adminActivo === true) {
+
+        adminActivo = false;
+
+        document.getElementById("admin-acciones").style.display = "none";
+
+        document.getElementById("btn-admin-login").textContent = "Modo Administrador";
+
+        mostrarJugadores();
+
+        alert("Modo administrador desactivado");
+
+        return;
+    }
+
+    let clave = prompt("Ingresa la clave de administrador");
+
+    if (clave === CLAVE_ADMIN) {
+
+        adminActivo = true;
+
+        document.getElementById("admin-acciones").style.display = "flex";
+
+        document.getElementById("btn-admin-login").textContent = "Salir de Modo Admin";
+
+        mostrarJugadores();
+
+        alert("Modo administrador activado");
+
+    } else {
+
+        alert("Clave incorrecta");
+    }
+}
+
+async function actualizarPartido() {
+
+    let modalidad = document.getElementById("input-modalidad").value.trim();
+    let cancha = document.getElementById("input-cancha").value.trim();
+    let hora = document.getElementById("input-hora").value.trim();
+    let precio = document.getElementById("input-precio").value.trim();
+
+    if (modalidad === "") {
+        alert("Ingresa la modalidad del partido");
+        return;
+    }
+
+    if (cancha === "") {
+        alert("Ingresa la cancha");
+        return;
+    }
+
+    if (hora === "") {
+        alert("Ingresa la hora");
+        return;
+    }
+
+    if (precio === "") {
+        alert("Ingresa el precio");
+        return;
+    }
+
+    datosPartido = {
+        modalidad: modalidad,
+        cancha: cancha,
+        hora: hora,
+        precio: precio
+    };
+
+    localStorage.setItem("datosPartido", JSON.stringify(datosPartido));
+
+    await guardarDatosPartidoFirebase();
+
+    cargarDatosPartido();
+
+    alert("Datos del partido actualizados y guardados");
+}
+
+function cargarDatosPartido() {
+
+    document.getElementById("partido-modalidad").textContent = "⚽ " + datosPartido.modalidad;
+    document.getElementById("partido-cancha").textContent = datosPartido.cancha;
+    document.getElementById("partido-hora").textContent = datosPartido.hora;
+    document.getElementById("partido-precio").textContent = datosPartido.precio;
+
+    document.getElementById("input-modalidad").value = datosPartido.modalidad;
+    document.getElementById("input-cancha").value = datosPartido.cancha;
+    document.getElementById("input-hora").value = datosPartido.hora;
+    document.getElementById("input-precio").value = datosPartido.precio;
+}
+
+async function guardarDatosPartidoFirebase() {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/configuracion/partido?key="
+        + config.apiKey;
+
+        const datos = {
+    fields: {
+        partidoId: {
+            stringValue: partidoId
+        },
+        modalidad: {
+            stringValue: datosPartido.modalidad
+        },
+        cancha: {
+            stringValue: datosPartido.cancha
+        },
+        hora: {
+            stringValue: datosPartido.hora
+        },
+        precio: {
+            stringValue: datosPartido.precio
+        },
+        actualizadoEn: {
+            timestampValue: new Date().toISOString()
+        }
+    }
+};
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Datos de partido guardados en Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudieron guardar los datos del partido en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error guardando datos del partido en Firebase:", error);
+        alert("Error de conexión guardando datos del partido");
+    }
+}
+
+
+async function cargarDatosPartidoFirebase() {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/configuracion/partido?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url);
+
+        const resultado = await respuesta.json();
+
+        console.log("Datos del partido desde Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            console.error("No se pudieron cargar los datos del partido desde Firebase:", resultado);
+            return;
+        }
+
+        const campos = resultado.fields;
+
+        datosPartido = {
+            modalidad: campos.modalidad ? campos.modalidad.stringValue : "Fulbito 9 vs 9",
+            cancha: campos.cancha ? campos.cancha.stringValue : "Cancha La 12",
+            hora: campos.hora ? campos.hora.stringValue : "Jueves 10:30 PM",
+            precio: campos.precio ? campos.precio.stringValue : "S/18 por jugador"
+        };
+
+        localStorage.setItem("datosPartido", JSON.stringify(datosPartido));
+
+        cargarDatosPartido();
+
+    } catch (error) {
+        console.error("Error cargando datos del partido desde Firebase:", error);
+    }
+}
+
+async function probarFirebase() {
+
+    alert("1. Botón funcionando");
+
+    try {
+
+        const config = window.firebaseConfig;
+
+        if (!config) {
+            alert("2. No encuentro firebaseConfig. Revisa firebase-config.js");
+            return;
+        }
+
+        alert("2. Config encontrada: " + config.projectId);
+
+        const url = "https://firestore.googleapis.com/v1/projects/" 
+            + config.projectId 
+            + "/databases/(default)/documents/pruebas?key=" 
+            + config.apiKey;
+
+        const datos = {
+            fields: {
+                mensaje: {
+                    stringValue: "Liga Dorada conectado"
+                },
+                fecha: {
+                    timestampValue: new Date().toISOString()
+                }
+            }
+        };
+
+        const respuesta = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const texto = await respuesta.text();
+
+        console.log("Respuesta Firebase:", texto);
+
+        if (respuesta.ok) {
+            alert("3. Firebase conectado correctamente");
+        } else {
+            alert("3. Firebase respondió con error. Mira la consola.");
+        }
+
+    } catch (error) {
+
+        console.error("Error JavaScript:", error);
+
+        alert("Error JavaScript: " + error.message);
+    }
+}
+
+
+async function guardarJugadorFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!config) {
+        alert("No encuentro firebaseConfig");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/" 
+        + config.projectId 
+        + "/databases/(default)/documents/inscritos?key=" 
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+    nombre: {
+        stringValue: jugador.nombre
+    },
+
+    edad: {
+    integerValue: Number(jugador.edad || 0)
+},
+distrito: {
+    stringValue: jugador.distrito || "No definido"
+},
+
+    correo: {
+        stringValue: jugador.correo
+    },
+    whatsapp: {
+        stringValue: jugador.whatsapp
+    },
+
+    jugadorId: {
+    stringValue: jugador.jugadorId || jugador.whatsapp
+},
+    posicion: {
+        stringValue: jugador.posicion
+    },
+    equipo: {
+        stringValue: jugador.equipo
+    },
+    partidoId: {
+    stringValue: jugador.partidoId || localStorage.getItem("pichangaSeleccionadaId") || partidoId
+    },
+
+    nivel: {
+    integerValue: jugador.nivel
+    },
+
+    pieDominante: {
+    stringValue: jugador.pieDominante || "No definido"
+},
+
+goles: {
+    integerValue: jugador.goles || 0
+},
+
+puntos: {
+    integerValue: jugador.puntos || 0
+},
+
+    estado: {
+    stringValue: jugador.estado
+    },
+
+    fechaRegistro: {
+        timestampValue: new Date().toISOString()
+    }
+}
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Jugador guardado en Firebase:", resultado);
+
+        if (respuesta.ok) {
+
+            jugador.firebaseId = resultado.name.split("/").pop();
+
+            localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+        } else {
+
+            alert("El jugador se guardó localmente, pero hubo un error guardando en Firebase.");
+        }
+
+    } catch (error) {
+
+        console.error("Error guardando jugador en Firebase:", error);
+
+        alert("El jugador se guardó localmente, pero no se pudo guardar en Firebase.");
+    }
+}
+
+async function cargarJugadoresFirebase() {
+
+    const config = window.firebaseConfig;
+
+    if (!config) {
+        console.error("No encuentro firebaseConfig");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/" 
+        + config.projectId 
+        + "/databases/(default)/documents/inscritos?key=" 
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url);
+
+        const resultado = await respuesta.json();
+
+        console.log("Inscritos desde Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            console.error("Error cargando inscritos desde Firebase:", resultado);
+            return;
+        }
+
+        let documentos = resultado.documents || [];
+
+        jugadores = documentos.map(function(documento) {
+
+            let campos = documento.fields || {};
+
+         return {
+    firebaseId: documento.name.split("/").pop(),
+    nombre: campos.nombre ? campos.nombre.stringValue : "",
+    correo: campos.correo ? campos.correo.stringValue : "",
+    whatsapp: campos.whatsapp ? campos.whatsapp.stringValue : "",
+    jugadorId: campos.jugadorId ? campos.jugadorId.stringValue : campos.whatsapp ? campos.whatsapp.stringValue : "",
+    posicion: campos.posicion ? campos.posicion.stringValue : "",
+    equipo: campos.equipo ? campos.equipo.stringValue : "A",
+    partidoId: campos.partidoId ? campos.partidoId.stringValue : "pichanga_actual",
+    edad: campos.edad ? Number(campos.edad.integerValue || campos.edad.stringValue) : "",
+    nivel: campos.nivel ? Number(campos.nivel.integerValue) : 1,
+    puntos: campos.puntos ? Number(campos.puntos.integerValue || campos.puntos.stringValue) : 0,
+    partidosJugados: campos.partidosJugados ? Number(campos.partidosJugados.integerValue || campos.partidosJugados.stringValue) : 0,
+    pieDominante: campos.pieDominante ? campos.pieDominante.stringValue : "No definido",
+    goles: campos.goles ? Number(campos.goles.integerValue || campos.goles.stringValue) : 0,
+    partidosJugados: campos.partidosJugados ? Number(campos.partidosJugados.integerValue) : 0,
+    puntos: campos.puntos ? Number(campos.puntos.integerValue) : 0,
+    estado: campos.estado ? campos.estado.stringValue : "Pendiente de pago",
+    reputacion: campos.reputacion ? campos.reputacion.stringValue : "Confiable 100%"
+    
+};
+        });
+
+
+        const partidoActivo = localStorage.getItem("pichangaSeleccionadaId") || partidoId;
+
+console.log("Partido activo para filtro:", partidoActivo);
+
+console.log("Todos los jugadores antes del filtro:", jugadores.map(function(jugador) {
+    return {
+        nombre: jugador.nombre,
+        whatsapp: jugador.whatsapp,
+        equipo: jugador.equipo,
+        estado: jugador.estado,
+        partidoId: jugador.partidoId
+    };
+}));
+
+jugadores = jugadores.filter(function(jugador) {
+    return jugador.partidoId === partidoActivo;
 });
 
-document.getElementById("btn-logout").addEventListener("click", cerrarPanelesCuenta);
+console.log("Jugadores filtrados:", jugadores);
 
-document.addEventListener("keydown", function(evento) {
-  if (evento.key === "Escape") {
-    cerrarPanelesCuenta();
-  }
+        inscritos = jugadores.length;
+
+        localStorage.setItem("jugadores", JSON.stringify(jugadores));
+        localStorage.setItem("inscritos", inscritos);
+
+        document.getElementById("contador-inscritos").textContent = inscritos;
+
+        mostrarJugadores();
+
+        mostrarEquiposDetallePichanga();
+
+        actualizarContadoresEquipos();
+
+        actualizarResumenPichanga();
+
+        actualizarBotonEnviar();
+
+    } catch (error) {
+        console.error("Error leyendo Firebase:", error);
+    }
+}
+
+async function actualizarEstadoFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=estado&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            estado: {
+                stringValue: jugador.estado
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Estado actualizado en Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo actualizar el estado en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando estado en Firebase:", error);
+        alert("Error de conexión actualizando estado");
+    }
+}
+
+
+async function actualizarEquipoFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=equipo&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            equipo: {
+                stringValue: jugador.equipo
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Equipo actualizado en Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo actualizar el equipo en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando equipo en Firebase:", error);
+        alert("Error de conexión actualizando equipo");
+    }
+}
+
+async function actualizarNivelFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=nivel&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            nivel: {
+                integerValue: jugador.nivel
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Nivel actualizado en Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo actualizar el nivel en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando nivel en Firebase:", error);
+        alert("Error de conexión actualizando nivel");
+    }
+}
+
+async function actualizarGolesFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=goles&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            goles: {
+                integerValue: jugador.goles || 0
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Goles actualizados en inscritos:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudieron actualizar los goles en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando goles:", error);
+        alert("Error de conexión actualizando goles");
+    }
+}
+
+async function actualizarPuntosFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=puntos&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            puntos: {
+                integerValue: jugador.puntos || 0
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Puntos actualizados en inscritos:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudieron actualizar los puntos en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando puntos:", error);
+        alert("Error de conexión actualizando puntos");
+    }
+}
+
+async function actualizarPuntosPerfilFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/jugadoresPerfil/"
+        + jugador.whatsapp
+        + "?updateMask.fieldPaths=puntos&updateMask.fieldPaths=actualizadoEn&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            puntos: {
+                integerValue: jugador.puntos || 0
+            },
+            actualizadoEn: {
+                timestampValue: new Date().toISOString()
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Puntos actualizados en perfil:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudieron actualizar los puntos en el perfil del jugador");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando puntos en perfil:", error);
+        alert("Error de conexión actualizando puntos en perfil");
+    }
+}
+
+async function cambiarPuntos(index, cambio) {
+
+    let jugador = jugadores[index];
+
+    let puntosActuales = jugador.puntos || 0;
+
+    let nuevosPuntos = puntosActuales + cambio;
+
+    if (nuevosPuntos < 0) {
+        alert("Los puntos no pueden ser negativos");
+        return;
+    }
+
+    jugador.puntos = nuevosPuntos;
+
+    await actualizarPuntosFirebase(jugador);
+
+    await actualizarPuntosPerfilFirebase(jugador);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+}
+
+async function actualizarPTFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=partidosJugados&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            partidosJugados: {
+                integerValue: jugador.partidosJugados || 0
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("PT actualizado en inscritos:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo actualizar PT en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando PT:", error);
+        alert("Error de conexión actualizando PT");
+    }
+}
+
+async function actualizarPTPerfilFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/jugadoresPerfil/"
+        + jugador.whatsapp
+        + "?updateMask.fieldPaths=partidosJugados&updateMask.fieldPaths=actualizadoEn&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            partidosJugados: {
+                integerValue: jugador.partidosJugados || 0
+            },
+            actualizadoEn: {
+                timestampValue: new Date().toISOString()
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("PT actualizado en perfil:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo actualizar PT en el perfil del jugador");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando PT en perfil:", error);
+        alert("Error de conexión actualizando PT en perfil");
+    }
+}
+
+async function cambiarPT(index, cambio) {
+
+    let jugador = jugadores[index];
+
+    let ptActual = jugador.partidosJugados || 0;
+
+    let nuevoPT = ptActual + cambio;
+
+    if (nuevoPT < 0) {
+        alert("PT no puede ser negativo");
+        return;
+    }
+
+    jugador.partidosJugados = nuevoPT;
+
+    await actualizarPTFirebase(jugador);
+
+    await actualizarPTPerfilFirebase(jugador);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+}
+
+async function cambiarGoles(index, cambio) {
+
+    let jugador = jugadores[index];
+
+    let golesActuales = jugador.goles || 0;
+
+    let nuevosGoles = golesActuales + cambio;
+
+    if (nuevosGoles < 0) {
+        alert("Los goles no pueden ser negativos");
+        return;
+    }
+
+    jugador.goles = nuevosGoles;
+
+    await actualizarGolesFirebase(jugador);
+
+    await actualizarGolesPerfilFirebase(jugador);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+}
+
+async function actualizarGolesPerfilFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/jugadoresPerfil/"
+        + jugador.whatsapp
+        + "?updateMask.fieldPaths=goles&updateMask.fieldPaths=actualizadoEn&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            goles: {
+                integerValue: jugador.goles || 0
+            },
+            actualizadoEn: {
+                timestampValue: new Date().toISOString()
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Goles actualizados en perfil:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudieron actualizar los goles en el perfil del jugador");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando goles en perfil:", error);
+        alert("Error de conexión actualizando goles en perfil");
+    }
+}
+
+async function actualizarPieDominanteFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?updateMask.fieldPaths=pieDominante&key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            pieDominante: {
+                stringValue: jugador.pieDominante || "No definido"
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Pie dominante actualizado en Firebase:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo actualizar el pie dominante en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error actualizando pie dominante en Firebase:", error);
+        alert("Error de conexión actualizando pie dominante");
+    }
+}
+
+
+async function cambiarPieDominante(index, pie) {
+
+    let jugador = jugadores[index];
+
+    jugador.pieDominante = pie;
+
+    await actualizarPieDominanteFirebase(jugador);
+
+    await guardarPerfilJugadorFirebase(jugador);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+}
+
+
+async function cambiarNivel(index, cambio) {
+
+    let jugador = jugadores[index];
+
+    let nivelActual = jugador.nivel || 1;
+
+    let nuevoNivel = nivelActual + cambio;
+
+    if (nuevoNivel < 1) {
+        alert("El nivel mínimo es 1");
+        return;
+    }
+
+    if (nuevoNivel > 10) {
+        alert("El nivel máximo es 10");
+        return;
+    }
+
+    jugador.nivel = nuevoNivel;
+
+    await actualizarNivelFirebase(jugador);
+
+    await guardarPerfilJugadorFirebase(jugador);
+
+    localStorage.setItem("jugadores", JSON.stringify(jugadores));
+
+    mostrarJugadores();
+}
+
+async function eliminarJugadorFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    if (!jugador.firebaseId) {
+        console.error("Este jugador no tiene firebaseId");
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + jugador.firebaseId
+        + "?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "DELETE"
+        });
+
+        console.log("Jugador eliminado de Firebase:", respuesta);
+
+        if (!respuesta.ok) {
+            alert("No se pudo eliminar el jugador en Firebase");
+        }
+
+    } catch (error) {
+        console.error("Error eliminando jugador en Firebase:", error);
+        alert("Error de conexión eliminando jugador");
+    }
+}
+
+async function eliminarTodosJugadoresFirebase() {
+
+    for (let i = 0; i < jugadores.length; i++) {
+        await eliminarJugadorFirebase(jugadores[i]);
+    }
+
+    console.log("Todos los jugadores fueron eliminados de Firebase");
+}
+
+async function guardarHistorialPichangaFirebase() {
+
+    const config = window.firebaseConfig;
+
+    const jugadoresConfirmados = jugadores.filter(function(jugador) {
+        return jugador.estado === "Confirmado ✅";
+    }).length;
+
+    const jugadoresPendientes = jugadores.filter(function(jugador) {
+        return jugador.estado !== "Confirmado ✅";
+    }).length;
+
+    const equipoA = jugadores.filter(function(jugador) {
+        return jugador.equipo === "A";
+    });
+
+    const equipoB = jugadores.filter(function(jugador) {
+        return jugador.equipo === "B";
+    });
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/historialPichangas?key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            partidoId: {
+                stringValue: partidoId
+            },
+            modalidad: {
+                stringValue: datosPartido.modalidad
+            },
+            cancha: {
+                stringValue: datosPartido.cancha
+            },
+            hora: {
+                stringValue: datosPartido.hora
+            },
+            precio: {
+                stringValue: datosPartido.precio
+            },
+            totalJugadores: {
+                integerValue: jugadores.length
+            },
+            confirmados: {
+                integerValue: jugadoresConfirmados
+            },
+            pendientes: {
+                integerValue: jugadoresPendientes
+            },
+            equipoAJson: {
+                stringValue: JSON.stringify(equipoA)
+            },
+            equipoBJson: {
+                stringValue: JSON.stringify(equipoB)
+            },
+            cerradoEn: {
+                timestampValue: new Date().toISOString()
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        const resultado = await respuesta.json();
+
+        console.log("Historial de pichanga guardado:", resultado);
+
+        if (!respuesta.ok) {
+            alert("No se pudo guardar el historial de la pichanga");
+        }
+
+    } catch (error) {
+        console.error("Error guardando historial de pichanga:", error);
+        alert("Error de conexión guardando historial");
+    }
+}
+
+async function guardarPerfilJugadorFirebase(jugador) {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/jugadoresPerfil/"
+        + jugador.whatsapp
+        + "?key="
+        + config.apiKey;
+
+    try {
+
+        const consulta = await fetch(url);
+
+        let datos;
+
+        if (consulta.ok) {
+
+            datos = {
+                fields: {
+                    nombre: {
+    stringValue: jugador.nombre
+},
+edad: {
+    integerValue: Number(jugador.edad || 0)
+},
+distrito: {
+    stringValue: jugador.distrito || "No definido"
+},
+correo: {
+    stringValue: jugador.correo
+},
+                    whatsapp: {
+    stringValue: jugador.whatsapp
+},
+jugadorId: {
+    stringValue: jugador.jugadorId || jugador.whatsapp
+},
+posicion: {
+    stringValue: jugador.posicion
+},
+                    nivel: {
+                        integerValue: jugador.nivel || 1
+                    },
+                    pieDominante: {
+                        stringValue: jugador.pieDominante || "No definido"
+                    },
+                    actualizadoEn: {
+                        timestampValue: new Date().toISOString()
+                    }
+                }
+            };
+
+            const respuesta = await fetch(
+    url + "&updateMask.fieldPaths=nombre&updateMask.fieldPaths=edad&updateMask.fieldPaths=distrito&updateMask.fieldPaths=correo",
+    {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(datos)
+    }
+);
+
+            const resultado = await respuesta.json();
+
+            console.log("Perfil existente actualizado:", resultado);
+
+            if (!respuesta.ok) {
+                alert("No se pudo actualizar el perfil permanente del jugador");
+            }
+
+        } else {
+
+            datos = {
+    fields: {
+        nombre: {
+            stringValue: jugador.nombre
+        },
+        edad: {
+            integerValue: Number(jugador.edad || 0)
+        },
+        distrito: {
+            stringValue: jugador.distrito || "No definido"
+        },
+        correo: {
+            stringValue: jugador.correo
+        },
+                    whatsapp: {
+                        stringValue: jugador.whatsapp
+                    },
+
+                    jugadorId: {
+    stringValue: jugador.jugadorId || jugador.whatsapp
+},
+
+                    posicion: {
+                        stringValue: jugador.posicion
+                    },
+                    nivel: {
+                        integerValue: jugador.nivel || 1
+                    },
+                    pieDominante: {
+                        stringValue: jugador.pieDominante || "No definido"
+                    },
+                    partidosJugados: {
+                        integerValue: 0
+                    },
+                    puntos: {
+                        integerValue: 0
+                    }, 
+                    goles: {
+    integerValue: 0
+},
+                    creadoEn: {
+                        timestampValue: new Date().toISOString()
+                    }
+                }
+            };
+
+            const respuesta = await fetch(url, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(datos)
+            });
+
+            const resultado = await respuesta.json();
+
+            console.log("Perfil nuevo creado:", resultado);
+
+            if (!respuesta.ok) {
+                alert("No se pudo crear el perfil permanente del jugador");
+            }
+        }
+
+    } catch (error) {
+        console.error("Error guardando perfil de jugador:", error);
+        alert("Error de conexión guardando perfil del jugador");
+    }
+}
+
+
+async function cargarPerfilJugadorFirebase(whatsapp) {
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/jugadoresPerfil/"
+        + whatsapp
+        + "?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url);
+
+        const resultado = await respuesta.json();
+
+        if (!respuesta.ok) {
+            console.log("No existe perfil previo para este jugador");
+            return null;
+        }
+
+        const campos = resultado.fields || {};
+
+        return {
+    nombre: campos.nombre ? campos.nombre.stringValue : "",
+    correo: campos.correo ? campos.correo.stringValue : "",
+    whatsapp: campos.whatsapp ? campos.whatsapp.stringValue : whatsapp,
+    jugadorId: campos.jugadorId ? campos.jugadorId.stringValue : whatsapp,
+    posicion: campos.posicion ? campos.posicion.stringValue : "",
+    nivel: campos.nivel ? Number(campos.nivel.integerValue || campos.nivel.stringValue) : 1,
+    partidosJugados: campos.partidosJugados ? Number(campos.partidosJugados.integerValue) : 0,
+    goles: campos.goles ? Number(campos.goles.integerValue) : 0,
+    puntos: campos.puntos ? Number(campos.puntos.integerValue) : 0,
+    pieDominante: campos.pieDominante ? campos.pieDominante.stringValue : "No definido",
+    reputacion: campos.reputacion ? campos.reputacion.stringValue : "Confiable"
+    };
+
+    } catch (error) {
+        console.error("Error cargando perfil del jugador:", error);
+        return null;
+    }
+}
+function actualizarModoPerfil() {
+    const checkPerfil = document.getElementById("usarPerfilLigaDorada");
+
+    if (!checkPerfil) {
+        return;
+    }
+
+    const usarPerfil = checkPerfil.checked;
+
+    const gruposOcultar = [
+        "grupo-nombre",
+        "grupo-edad",
+        "grupo-distrito",
+        "grupo-correo",
+        "grupo-pie-dominante"
+    ];
+
+    gruposOcultar.forEach(function(idGrupo) {
+        const grupo = document.getElementById(idGrupo);
+
+        if (grupo) {
+            grupo.style.display = usarPerfil ? "none" : "flex";
+        }
+    });
+}
+
+
+async function mostrarPerfilEncontrado() {
+
+    const checkPerfil = document.getElementById("usarPerfilLigaDorada");
+    const campoWhatsapp = document.getElementById("whatsapp");
+    const mensajePerfil = document.getElementById("mensajePerfilEncontrado");
+
+    if (!checkPerfil || !campoWhatsapp || !mensajePerfil) {
+        return;
+    }
+
+    mensajePerfil.innerHTML = "";
+
+    if (!checkPerfil.checked) {
+        return;
+    }
+
+    const whatsapp = campoWhatsapp.value.trim();
+
+    if (whatsapp.length !== 9) {
+        mensajePerfil.innerHTML = "Ingresa tu WhatsApp de 9 dígitos para buscar tu perfil.";
+        return;
+    }
+
+    const perfil = await cargarPerfilJugadorFirebase(whatsapp);
+
+    if (!perfil) {
+        mensajePerfil.innerHTML = "No encontramos un perfil con ese WhatsApp.";
+        return;
+    }
+
+    if (perfil.nombre === "") {
+        mensajePerfil.innerHTML = "Perfil encontrado, pero está incompleto. Contacta al administrador.";
+        return;
+    }
+
+    mensajePerfil.innerHTML =
+        "<strong>Perfil encontrado:</strong> " + perfil.nombre + "<br>" +
+        perfil.nivel + "⭐ | PT: " + perfil.partidosJugados +
+        " | Goles: " + perfil.goles +
+        " | Puntos: " + perfil.puntos;
+}
+
+function validarCorreo(correo) {
+    const patronCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return patronCorreo.test(correo);
+}
+
+
+let palabraSecretaAdmin = "";
+
+document.addEventListener("keydown", function(event) {
+    palabraSecretaAdmin += event.key.toLowerCase();
+
+    if (palabraSecretaAdmin.length > 10) {
+        palabraSecretaAdmin = palabraSecretaAdmin.slice(-10);
+    }
+
+    if (palabraSecretaAdmin.includes("dorada")) {
+        const botonAdmin = document.getElementById("btn-admin-login");
+
+        if (botonAdmin) {
+            botonAdmin.style.display = "inline-block";
+        }
+
+        palabraSecretaAdmin = "";
+    }
 });
+
+async function obtenerPerfilPorWhatsapp(whatsapp) {
+    const projectId = window.firebaseConfig.projectId;
+
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/jugadoresPerfil/${whatsapp}`;
+
+    const respuesta = await fetch(url);
+
+    if (!respuesta.ok) {
+        return null;
+    }
+
+    const data = await respuesta.json();
+
+    if (!data.fields) {
+        return null;
+    }
+
+    return {
+        nombre: data.fields.nombre?.stringValue || "",
+        edad: Number(data.fields.edad?.integerValue || 0),
+        distrito: data.fields.distrito?.stringValue || "No definido",
+        correo: data.fields.correo?.stringValue || "",
+        whatsapp: data.fields.whatsapp?.stringValue || whatsapp,
+        jugadorId: data.fields.jugadorId?.stringValue || whatsapp,
+        posicion: data.fields.posicion?.stringValue || "",
+        nivel: Number(data.fields.nivel?.integerValue || 1),
+        pieDominante: data.fields.pieDominante?.stringValue || "",
+        partidosJugados: Number(data.fields.partidosJugados?.integerValue || 0),
+        goles: Number(data.fields.goles?.integerValue || 0),
+        puntos: Number(data.fields.puntos?.integerValue || 0),
+        reputacion: data.fields.reputacion?.stringValue || "Confiable 100%"
+    };
+}
+
+
+async function buscarMiPerfil() {
+    const whatsapp = document.getElementById("whatsappPerfil").value.trim();
+    const resultado = document.getElementById("resultadoMiPerfil");
+
+    if (!whatsapp) {
+        resultado.innerHTML = "<p class='error'>Ingresa tu WhatsApp para buscar tu perfil.</p>";
+        return;
+    }
+
+    if (!/^9\d{8}$/.test(whatsapp)) {
+        resultado.innerHTML = "<p class='error'>El WhatsApp debe tener 9 dígitos y empezar con 9.</p>";
+        return;
+    }
+
+    try {
+        const perfil = await obtenerPerfilPorWhatsapp(whatsapp);
+
+        if (!perfil) {
+            resultado.innerHTML = "<p class='error'>No encontramos un perfil Liga Dorada con ese WhatsApp.</p>";
+            return;
+        }
+
+        const inscripcionActual = jugadores.find(jugador => jugador.whatsapp === whatsapp);
+
+        resultado.innerHTML = `
+    <div class="perfil-resultado-card">
+        <div class="perfil-top">
+            <div class="perfil-avatar-grande">👤</div>
+
+            <div class="perfil-main">
+                <div class="perfil-nombre-reputacion">
+    <h3>${perfil.nombre || "Jugador Liga Dorada"}</h3>
+
+    <span class="reputacion-mini ${
+    (perfil.reputacion || "Confiable").toLowerCase().startsWith("no confiable")
+        ? "reputacion-no-confiable"
+        : (perfil.reputacion || "Confiable").toLowerCase().startsWith("poco confiable")
+            ? "reputacion-poco-confiable"
+            : "reputacion-confiable"
+}">
+    🛡️ ${perfil.reputacion || "Confiable"}
+</span>
+</div>
+                <p class="perfil-meta">
+                    ${perfil.edad ? perfil.edad + " años" : "Edad no definida"} · 
+                    ${perfil.distrito || "Distrito no definido"}
+                </p>
+                <p class="perfil-id">
+                    ID: ${perfil.jugadorId || perfil.whatsapp || whatsapp}
+                </p>
+            </div>
+        </div>
+
+        <div class="perfil-stats-grid">
+
+            <div class="stat-mini-card">
+                <span class="stat-label">Nivel</span>
+                <strong>${perfil.nivel || 1} ⭐</strong>
+            </div>
+
+            <div class="stat-mini-card">
+                <span class="stat-label">PT</span>
+                <strong>${perfil.partidosJugados || 0}</strong>
+            </div>
+
+            <div class="stat-mini-card">
+                <span class="stat-label">Goles</span>
+                <strong>${perfil.goles || 0}</strong>
+            </div>
+
+            <div class="stat-mini-card">
+                <span class="stat-label">Puntos</span>
+                <strong>${perfil.puntos || 0}</strong>
+            </div>
+        </div>
+
+        <div class="perfil-bloque">
+            <p><strong>Posición registrada:</strong> ${perfil.posicion || "No registrada"}</p>
+            <p><strong>Pie dominante:</strong> ${perfil.pieDominante || "No registrado"}</p>
+            <p><strong>WhatsApp:</strong> ${perfil.whatsapp || whatsapp}</p>
+            <p><strong>Correo:</strong> ${perfil.correo || "No registrado"}</p>
+        </div>
+
+        <div class="perfil-bloque">
+            <h4>🔥 Pichanga actual</h4>
+            <p><strong>Estado:</strong> ${
+                inscripcionActual
+                    ? (inscripcionActual.estado === "Confirmado"
+                        ? "Confirmado ✅"
+                        : inscripcionActual.estado)
+                    : "No inscrito actualmente"
+            }</p>
+            <p><strong>Equipo:</strong> ${inscripcionActual ? inscripcionActual.equipo : "Sin equipo actual"}</p>
+            <p><strong>Posición en esta pichanga:</strong> ${inscripcionActual ? inscripcionActual.posicion : "No inscrito"}</p>
+        </div>
+    </div>
+`;
+    } catch (error) {
+        console.error("Error buscando perfil:", error);
+        resultado.innerHTML = "<p class='error'>Ocurrió un error al buscar tu perfil. Intenta nuevamente.</p>";
+    }
+}
+
+
+async function cargarPichangasFirebase() {
+    const config = window.firebaseConfig;
+
+    if (!config) {
+        console.error("No encuentro firebaseConfig");
+        return;
+    }
+
+    const contenedor = document.getElementById("lista-pichangas");
+
+    if (!contenedor) {
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/pichangas?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url);
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok || !datos.documents) {
+            contenedor.innerHTML = "<p>No hay pichangas disponibles todavía.</p>";
+            return;
+        }
+
+        pichangasCargadas = datos.documents.map(function(doc) {
+            const fields = doc.fields || {};
+
+            return {
+                id: fields.id ? fields.id.stringValue : doc.name.split("/").pop(),
+                nombre: fields.nombre ? fields.nombre.stringValue : "Pichanga sin nombre",
+                cancha: fields.cancha ? fields.cancha.stringValue : "Por definir",
+                hora: fields.hora ? fields.hora.stringValue : "Por definir",
+                modalidad: fields.modalidad ? fields.modalidad.stringValue : "Por definir",
+                precio: fields.precio ? fields.precio.stringValue : "Por confirmar",
+                cupos: fields.cupos ? Number(fields.cupos.integerValue) : 18,
+                estado: fields.estado ? fields.estado.stringValue : "Disponible"
+            };
+        });
+
+        await cargarConteoInscritosPorPichanga();
+
+mostrarPichangasEnCartelera(pichangasCargadas);
+llenarSelectorAdminPichangas();
+
+    } catch (error) {
+        console.error("Error cargando pichangas:", error);
+        contenedor.innerHTML = "<p>Error al cargar pichangas.</p>";
+    }
+}
+
+
+function mostrarPichangasEnCartelera(pichangas) {
+    const contenedor = document.getElementById("lista-pichangas");
+
+    if (!contenedor) {
+        return;
+    }
+
+    if (!pichangas || pichangas.length === 0) {
+        contenedor.innerHTML = "<p>No hay pichangas disponibles todavía.</p>";
+        return;
+    }
+
+    contenedor.innerHTML = "";
+
+    pichangas.forEach(function(pichanga) {
+        const estaDisponible = pichanga.estado === "Disponible";
+
+        const card = document.createElement("div");
+        card.className = estaDisponible ? "pichanga-card activa" : "pichanga-card proximamente";
+
+        const etiqueta = document.createElement("div");
+        etiqueta.className = "pichanga-etiqueta";
+        etiqueta.textContent = pichanga.estado;
+
+        const titulo = document.createElement("h3");
+        titulo.textContent = pichanga.nombre;
+
+        const cancha = document.createElement("p");
+        cancha.innerHTML = "<strong>Cancha:</strong> " + pichanga.cancha;
+
+        const hora = document.createElement("p");
+        hora.innerHTML = "<strong>Hora:</strong> " + pichanga.hora;
+
+        const modalidad = document.createElement("p");
+        modalidad.innerHTML = "<strong>Modalidad:</strong> " + pichanga.modalidad;
+
+        const precio = document.createElement("p");
+        precio.innerHTML = "<strong>Precio:</strong> " + pichanga.precio;
+
+        const inscritosPichanga = conteoInscritosPorPichanga[pichanga.id] || 0;
+
+const cupos = document.createElement("div");
+cupos.className = "pichanga-cupos";
+cupos.innerHTML = "<span>" + inscritosPichanga + "/" + pichanga.cupos + " inscritos</span>";
+
+        const boton = document.createElement("button");
+        boton.className = estaDisponible ? "btn-gold" : "btn-gold btn-disabled";
+        boton.textContent = estaDisponible ? "Ver detalles / Reservar" : "Próximamente";
+
+        if (!estaDisponible) {
+            boton.disabled = true;
+        }
+
+        if (estaDisponible) {
+            boton.addEventListener("click", function() {
+                console.log("Click en pichanga:", pichanga.id, pichanga.nombre);
+                verDetallePichanga(pichanga.id);
+            });
+        }
+
+        card.appendChild(etiqueta);
+        card.appendChild(titulo);
+        card.appendChild(cancha);
+        card.appendChild(hora);
+        card.appendChild(modalidad);
+        card.appendChild(precio);
+        card.appendChild(cupos);
+        card.appendChild(boton);
+
+        contenedor.appendChild(card);
+    });
+}
+
+
+function verDetallePichanga(idPichanga) {
+    const pichanga = pichangasCargadas.find(function(item) {
+        return item.id === idPichanga;
+    });
+
+    if (!pichanga) {
+        alert("No se encontró esta pichanga.");
+        return;
+    }
+
+    partidoId = idPichanga;
+
+    localStorage.setItem("pichangaSeleccionadaId", idPichanga);
+    localStorage.setItem("pichangaSeleccionadaNombre", pichanga.nombre);
+
+    document.getElementById("detalle-pichanga-titulo").textContent = "🏆 " + pichanga.nombre;
+    document.getElementById("detalle-pichanga-modalidad").textContent = "⚽ " + pichanga.modalidad;
+    document.getElementById("detalle-pichanga-cancha").textContent = pichanga.cancha;
+    document.getElementById("detalle-pichanga-hora").textContent = pichanga.hora;
+    document.getElementById("detalle-pichanga-precio").textContent = pichanga.precio;
+    document.getElementById("detalle-pichanga-cupos").textContent = "0/" + pichanga.cupos + " inscritos";
+
+    const detalle = document.getElementById("detalle-pichanga");
+
+    if (detalle) {
+        detalle.style.display = "block";
+
+        detalle.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
+
+    cargarJugadoresFirebase();
+}
+
+
+function mostrarEquiposDetallePichanga() {
+    const listaA = document.getElementById("detalle-lista-equipo-a");
+    const listaB = document.getElementById("detalle-lista-equipo-b");
+    const contadorA = document.getElementById("detalle-contador-equipo-a");
+    const contadorB = document.getElementById("detalle-contador-equipo-b");
+
+    if (!listaA || !listaB || !contadorA || !contadorB) {
+        return;
+    }
+
+    listaA.innerHTML = "";
+    listaB.innerHTML = "";
+
+    const jugadoresEquipoA = jugadores.filter(function(jugador) {
+        const equipo = (jugador.equipo || "").toLowerCase();
+        return equipo === "a" || equipo === "equipo a" || equipo === "equipoa";
+    });
+
+    const jugadoresEquipoB = jugadores.filter(function(jugador) {
+        const equipo = (jugador.equipo || "").toLowerCase();
+        return equipo === "b" || equipo === "equipo b" || equipo === "equipob";
+    });
+
+    contadorA.textContent = jugadoresEquipoA.length;
+    contadorB.textContent = jugadoresEquipoB.length;
+
+    const contadorDetalle = document.getElementById("detalle-pichanga-cupos");
+
+if (contadorDetalle) {
+    const totalJugadoresDetalle = jugadoresEquipoA.length + jugadoresEquipoB.length;
+
+    const pichangaActiva = pichangasCargadas.find(function(pichanga) {
+        return pichanga.id === partidoId;
+    });
+
+    const cuposMaximos = pichangaActiva ? pichangaActiva.cupos : 0;
+
+    contadorDetalle.textContent = totalJugadoresDetalle + "/" + cuposMaximos + " inscritos";
+}
+
+    if (jugadoresEquipoA.length === 0) {
+        const item = document.createElement("li");
+        item.textContent = "Aún no hay jugadores confirmados.";
+        item.className = "empty-player";
+        listaA.appendChild(item);
+    }
+
+    if (jugadoresEquipoB.length === 0) {
+        const item = document.createElement("li");
+        item.textContent = "Aún no hay jugadores confirmados.";
+        item.className = "empty-player";
+        listaB.appendChild(item);
+    }
+
+    jugadoresEquipoA.forEach(function(jugador, index) {
+        const item = document.createElement("li");
+
+        item.innerHTML = `
+            <div class="jugador-top">
+                <div class="jugador-nombre">${jugador.nombre || "Jugador Liga Dorada"}</div>
+                <div class="jugador-numero">${index + 1}</div>
+            </div>
+
+            <div class="jugador-meta">
+                <span class="meta-pill posicion">⚽ ${jugador.posicion || "Sin posición"}</span>
+                <span class="meta-pill nivel">⭐ ${jugador.nivel || 1}</span>
+                <span class="meta-pill pie">🦶 ${jugador.pieDominante || "No definido"}</span>
+                <span class="meta-pill edad">🎂 ${jugador.edad || "-"} años</span>
+            </div>
+            <button class="btn-ver-caracteristicas" onclick="verCaracteristicasJugador('${jugador.whatsapp}')">
+    Ver características
+</button>
+
+        `;
+
+        listaA.appendChild(item);
+    });
+
+    jugadoresEquipoB.forEach(function(jugador, index) {
+        const item = document.createElement("li");
+
+        item.innerHTML = `
+            <div class="jugador-top">
+                <div class="jugador-nombre">${jugador.nombre || "Jugador Liga Dorada"}</div>
+                <div class="jugador-numero">${index + 1}</div>
+            </div>
+
+            <div class="jugador-meta">
+                <span class="meta-pill posicion">⚽ ${jugador.posicion || "Sin posición"}</span>
+                <span class="meta-pill nivel">⭐ ${jugador.nivel || 1}</span>
+                <span class="meta-pill pie">🦶 ${jugador.pieDominante || "No definido"}</span>
+                <span class="meta-pill edad">🎂 ${jugador.edad || "-"} años</span>
+            </div>
+            <button class="btn-ver-caracteristicas" onclick="verCaracteristicasJugador('${jugador.whatsapp}')">
+    Ver características
+</button>
+        `;
+
+        listaB.appendChild(item);
+    });
+
+    console.log("Pichanga activa:", partidoId);
+    console.log("Pichanga activa localStorage:", localStorage.getItem("pichangaSeleccionadaId"));
+    console.log("Jugadores cargados para detalle:", jugadores);
+}
+
+
+function contarJugadoresPorPichanga(idPichanga) {
+    const jugadoresGuardados = JSON.parse(localStorage.getItem("jugadores")) || [];
+
+    const jugadoresDeEstaPichanga = jugadoresGuardados.filter(function(jugador) {
+        return jugador.partidoId === idPichanga;
+    });
+
+    return jugadoresDeEstaPichanga.length;
+}
+
+
+function verCaracteristicasJugador(whatsapp) {
+    const inputPerfil = document.getElementById("whatsappPerfil");
+    const seccionPerfil = document.getElementById("mi-perfil");
+
+    if (!inputPerfil) {
+        alert("No se encontró el buscador de perfil.");
+        return;
+    }
+
+    inputPerfil.value = whatsapp;
+
+    if (seccionPerfil) {
+        seccionPerfil.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
+
+    if (typeof buscarMiPerfil === "function") {
+        buscarMiPerfil();
+    } else if (typeof verMiPerfil === "function") {
+        verMiPerfil();
+    } else {
+        alert("No se encontró la función para ver el perfil.");
+    }
+}
+
+function irACarteleraPichangas() {
+    const cartelera = document.getElementById("cartelera-pichangas");
+
+    if (cartelera) {
+        cartelera.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
+}
+
+
+function llenarSelectorAdminPichangas() {
+    const selector = document.getElementById("admin-selector-pichanga");
+
+    if (!selector) {
+        return;
+    }
+
+    selector.innerHTML = '<option value="">Selecciona una pichanga</option>';
+
+    pichangasCargadas.forEach(function(pichanga) {
+        const option = document.createElement("option");
+        option.value = pichanga.id;
+        option.textContent = pichanga.nombre;
+        selector.appendChild(option);
+    });
+}
+
+
+function seleccionarPichangaAdmin() {
+    const selector = document.getElementById("admin-selector-pichanga");
+
+    if (!selector) {
+        return;
+    }
+
+    const idPichanga = selector.value;
+
+    if (!idPichanga) {
+        return;
+    }
+
+    const pichanga = pichangasCargadas.find(function(item) {
+        return item.id === idPichanga;
+    });
+
+    if (!pichanga) {
+        alert("No se encontró la pichanga seleccionada.");
+        return;
+    }
+
+    partidoId = idPichanga;
+    localStorage.setItem("pichangaSeleccionadaId", idPichanga);
+    localStorage.setItem("pichangaSeleccionadaNombre", pichanga.nombre);
+
+    const inputNombre = document.getElementById("input-nombre-pichanga");
+const inputModalidad = document.getElementById("input-modalidad");
+const inputCancha = document.getElementById("input-cancha");
+const inputHora = document.getElementById("input-hora");
+const inputPrecio = document.getElementById("input-precio");
+const inputCupos = document.getElementById("input-cupos-pichanga");
+const inputEstado = document.getElementById("input-estado-pichanga");
+
+if (inputNombre) {
+    inputNombre.value = pichanga.nombre;
+}    
+
+if (inputModalidad) {
+        inputModalidad.value = pichanga.modalidad;
+    }
+
+    if (inputCancha) {
+        inputCancha.value = pichanga.cancha;
+    }
+
+    if (inputHora) {
+        inputHora.value = pichanga.hora;
+    }
+
+    if (inputPrecio) {
+        inputPrecio.value = pichanga.precio;
+    }
+
+    if (inputCupos) {
+    inputCupos.value = pichanga.cupos;
+}
+
+if (inputEstado) {
+    inputEstado.value = pichanga.estado;
+}
+
+    cargarJugadoresFirebase();
+
+setTimeout(function() {
+    mostrarJugadoresAdminPichanga();
+    actualizarResumenAdminPichanga(idPichanga);
+}, 500);
+
+console.log("Pichanga seleccionada en admin:", pichanga);
+}
+
+
+async function actualizarPichangaAdmin() {
+    const selector = document.getElementById("admin-selector-pichanga");
+
+    if (!selector || !selector.value) {
+        alert("Selecciona una pichanga para actualizar.");
+        return;
+    }
+
+    const idPichanga = selector.value;
+
+    const nombre = document.getElementById("input-nombre-pichanga").value.trim();
+    const modalidad = document.getElementById("input-modalidad").value.trim();
+    const cancha = document.getElementById("input-cancha").value.trim();
+    const hora = document.getElementById("input-hora").value.trim();
+    const precio = document.getElementById("input-precio").value.trim();
+    const cupos = document.getElementById("input-cupos-pichanga").value;
+    const estado = document.getElementById("input-estado-pichanga").value;
+
+    if (!nombre || !modalidad || !cancha || !hora || !precio || !cupos) {
+        alert("Completa todos los campos de la pichanga.");
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/pichangas/"
+        + idPichanga
+        + "?key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            id: {
+                stringValue: idPichanga
+            },
+            nombre: {
+                stringValue: nombre
+            },
+            modalidad: {
+                stringValue: modalidad
+            },
+            cancha: {
+                stringValue: cancha
+            },
+            hora: {
+                stringValue: hora
+            },
+            precio: {
+                stringValue: precio
+            },
+            cupos: {
+                integerValue: Number(cupos)
+            },
+            estado: {
+                stringValue: estado
+            },
+            actualizadaEn: {
+                timestampValue: new Date().toISOString()
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo actualizar la pichanga.");
+        }
+
+        alert("Pichanga actualizada correctamente.");
+
+        await cargarPichangasFirebase();
+
+        const selectorActualizado = document.getElementById("admin-selector-pichanga");
+
+        if (selectorActualizado) {
+            selectorActualizado.value = idPichanga;
+        }
+
+        seleccionarPichangaAdmin();
+        actualizarResumenAdminPichanga(idPichanga);
+
+    } catch (error) {
+        console.error("Error actualizando pichanga:", error);
+        alert("Error al actualizar la pichanga. Revisa la consola.");
+    }
+}
+
+
+async function cargarConteoInscritosPorPichanga() {
+    const config = window.firebaseConfig;
+
+    if (!config) {
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url);
+        const datos = await respuesta.json();
+
+        conteoInscritosPorPichanga = {};
+
+        if (!respuesta.ok || !datos.documents) {
+            return;
+        }
+
+        datos.documents.forEach(function(documento) {
+            const campos = documento.fields || {};
+            const idPichanga = campos.partidoId ? campos.partidoId.stringValue : "pichanga_actual";
+
+            if (!conteoInscritosPorPichanga[idPichanga]) {
+                conteoInscritosPorPichanga[idPichanga] = 0;
+            }
+
+            conteoInscritosPorPichanga[idPichanga]++;
+        });
+
+        console.log("Conteo por pichanga:", conteoInscritosPorPichanga);
+
+    } catch (error) {
+        console.error("Error contando inscritos por pichanga:", error);
+    }
+}
+
+
+async function actualizarResumenAdminPichanga(idPichanga) {
+    const config = window.firebaseConfig;
+
+    if (!config || !idPichanga) {
+        return;
+    }
+
+    const pichanga = pichangasCargadas.find(function(item) {
+        return item.id === idPichanga;
+    });
+
+    if (!pichanga) {
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url);
+        const datos = await respuesta.json();
+
+        let confirmados = 0;
+        let pendientes = 0;
+
+        if (respuesta.ok && datos.documents) {
+            datos.documents.forEach(function(documento) {
+                const campos = documento.fields || {};
+                const partidoJugador = campos.partidoId ? campos.partidoId.stringValue : "pichanga_actual";
+                const estadoJugador = campos.estado ? campos.estado.stringValue : "Pendiente de pago";
+
+                if (partidoJugador === idPichanga) {
+                    if (estadoJugador.toLowerCase().includes("confirmado")) {
+                        confirmados++;
+                    } else {
+                        pendientes++;
+                    }
+                }
+            });
+        }
+
+        const totalInscritos = confirmados + pendientes;
+        const cuposLibres = Math.max(Number(pichanga.cupos) - totalInscritos, 0);
+
+        const contadorConfirmados = document.getElementById("contador-confirmados");
+        const contadorPendientes = document.getElementById("contador-pendientes");
+        const contadorLibres = document.getElementById("contador-libres");
+
+        if (contadorConfirmados) {
+            contadorConfirmados.textContent = confirmados;
+        }
+
+        if (contadorPendientes) {
+            contadorPendientes.textContent = pendientes;
+        }
+
+        if (contadorLibres) {
+            contadorLibres.textContent = cuposLibres;
+        }
+
+    } catch (error) {
+        console.error("Error actualizando resumen admin:", error);
+    }
+}
+
+async function crearPichangaAdmin() {
+    const nombre = document.getElementById("input-nombre-pichanga").value.trim();
+    const modalidad = document.getElementById("input-modalidad").value.trim();
+    const cancha = document.getElementById("input-cancha").value.trim();
+    const hora = document.getElementById("input-hora").value.trim();
+    const precio = document.getElementById("input-precio").value.trim();
+    const cupos = document.getElementById("input-cupos-pichanga").value;
+    const estado = document.getElementById("input-estado-pichanga").value;
+
+    if (!nombre || !modalidad || !cancha || !hora || !precio || !cupos) {
+        alert("Completa todos los campos para crear la pichanga.");
+        return;
+    }
+
+    const confirmar = confirm("¿Crear esta nueva pichanga?");
+
+    if (!confirmar) {
+        return;
+    }
+
+    const idBase = nombre
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+    const idPichanga = idBase + "_" + Date.now();
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/pichangas/"
+        + idPichanga
+        + "?key="
+        + config.apiKey;
+
+    const datos = {
+        fields: {
+            id: {
+                stringValue: idPichanga
+            },
+            nombre: {
+                stringValue: nombre
+            },
+            modalidad: {
+                stringValue: modalidad
+            },
+            cancha: {
+                stringValue: cancha
+            },
+            hora: {
+                stringValue: hora
+            },
+            precio: {
+                stringValue: precio
+            },
+            cupos: {
+                integerValue: Number(cupos)
+            },
+            estado: {
+                stringValue: estado
+            },
+            creadaEn: {
+                timestampValue: new Date().toISOString()
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo crear la pichanga.");
+        }
+
+        alert("Nueva pichanga creada correctamente.");
+
+        await cargarPichangasFirebase();
+
+        const selector = document.getElementById("admin-selector-pichanga");
+
+        if (selector) {
+            selector.value = idPichanga;
+        }
+
+        seleccionarPichangaAdmin();
+
+    } catch (error) {
+        console.error("Error creando pichanga:", error);
+        alert("Error al crear la pichanga. Revisa la consola.");
+    }
+}
+
+
+async function eliminarPichangaAdmin() {
+    const selector = document.getElementById("admin-selector-pichanga");
+
+    if (!selector || !selector.value) {
+        alert("Selecciona una pichanga para eliminar.");
+        return;
+    }
+
+    const idPichanga = selector.value;
+
+    const pichanga = pichangasCargadas.find(function(item) {
+        return item.id === idPichanga;
+    });
+
+    if (!pichanga) {
+        alert("No se encontró la pichanga seleccionada.");
+        return;
+    }
+
+    const confirmar = confirm("¿Seguro que quieres eliminar la pichanga: " + pichanga.nombre + "?");
+
+    if (!confirmar) {
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/pichangas/"
+        + idPichanga
+        + "?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "DELETE"
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo eliminar la pichanga.");
+        }
+
+        alert("Pichanga eliminada correctamente.");
+
+        await cargarPichangasFirebase();
+
+        selector.value = "";
+
+        document.getElementById("input-nombre-pichanga").value = "";
+        document.getElementById("input-modalidad").value = "";
+        document.getElementById("input-cancha").value = "";
+        document.getElementById("input-hora").value = "";
+        document.getElementById("input-precio").value = "";
+        document.getElementById("input-cupos-pichanga").value = "";
+        document.getElementById("input-estado-pichanga").value = "Disponible";
+
+    } catch (error) {
+        console.error("Error eliminando pichanga:", error);
+        alert("Error al eliminar la pichanga. Revisa la consola.");
+    }
+}
+
+function mostrarJugadoresAdminPichanga() {
+    const contenedor = document.getElementById("admin-lista-jugadores-pichanga");
+
+    if (!contenedor) {
+        return;
+    }
+
+    const idPichanga = localStorage.getItem("pichangaSeleccionadaId") || partidoId;
+
+    if (!idPichanga) {
+        contenedor.innerHTML = "<p>Selecciona una pichanga para ver sus jugadores.</p>";
+        return;
+    }
+
+    const jugadoresDeEstaPichanga = jugadores.filter(function(jugador) {
+        return jugador.partidoId === idPichanga;
+    });
+
+    if (jugadoresDeEstaPichanga.length === 0) {
+        contenedor.innerHTML = "<p>No hay jugadores registrados en esta pichanga.</p>";
+        return;
+    }
+
+    contenedor.innerHTML = "";
+
+    jugadoresDeEstaPichanga.forEach(function(jugador) {
+        const card = document.createElement("div");
+        card.className = "admin-jugador-card";
+
+        card.innerHTML = `
+            <h4>${jugador.nombre || "Jugador Liga Dorada"}</h4>
+
+            <p><strong>WhatsApp:</strong> ${jugador.whatsapp || "-"}</p>
+            <p><strong>Equipo:</strong> ${jugador.equipo || "-"}</p>
+            <p><strong>Posición:</strong> ${jugador.posicion || "-"}</p>
+            <p><strong>Nivel:</strong> ${jugador.nivel || 1}</p>
+            <p><strong>Puntos:</strong> ${jugador.puntos || 0}</p>
+            <p><strong>Partidos:</strong> ${jugador.partidosJugados || 0}</p>
+            <p><strong>Goles:</strong> ${jugador.goles || 0}</p>
+            <p><strong>Estado:</strong> ${jugador.estado || "Pendiente de pago"}</p>
+
+            <div class="admin-jugador-acciones">
+                <button class="btn-admin-confirmar" onclick="confirmarPagoJugadorAdmin('${jugador.firebaseId}')">
+                    Confirmar pago
+                </button>
+
+                <button class="btn-admin-equipo" onclick="cambiarEquipoJugadorAdmin('${jugador.firebaseId}', '${jugador.equipo || "A"}')">
+                    Cambiar equipo
+                </button>
+
+                <button class="btn-admin" onclick="cambiarPosicionJugadorAdmin('${jugador.firebaseId}', '${jugador.posicion || ""}')">
+    Cambiar posición
+</button>
+
+                <button class="btn-admin-nivel" onclick="cambiarNivelJugadorAdmin('${jugador.firebaseId}', '${jugador.nivel || 1}')">
+                Cambiar nivel
+                </button>
+
+                <button class="btn-admin-nivel" onclick="cambiarPuntosJugadorAdmin('${jugador.firebaseId}', '${jugador.puntos || 0}')">
+                Cambiar puntos
+                </button>
+
+                <button class="btn-admin-nivel" onclick="cambiarPartidosJugadorAdmin('${jugador.firebaseId}', '${jugador.partidosJugados || 0}')">
+                Cambiar partidos
+                </button>
+
+                <button class="btn-admin-nivel" onclick="cambiarGolesJugadorAdmin('${jugador.firebaseId}', '${jugador.goles || 0}')">
+    Cambiar goles
+</button>
+
+<button
+    class="btn-admin"
+    onclick="cambiarReputacionJugadorAdmin('${jugador.firebaseId}')"
+>
+    Cambiar reputación
+</button>
+
+<button class="btn-admin-eliminar" onclick="eliminarJugadorAdmin('${jugador.firebaseId}')">
+    Eliminar
+</button>
+            </div>
+        `;
+
+        contenedor.appendChild(card);
+    });
+}
+
+
+async function confirmarPagoJugadorAdmin(firebaseId) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths=estado";
+
+    const datos = {
+        fields: {
+            estado: {
+                stringValue: "Confirmado ✅"
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo confirmar el pago.");
+        }
+
+        await refrescarAdminJugadores();
+
+        alert("Pago confirmado correctamente.");
+
+    } catch (error) {
+        console.error("Error confirmando pago:", error);
+        alert("Error al confirmar pago. Revisa la consola.");
+    }
+}
+
+
+async function cambiarEquipoJugadorAdmin(firebaseId, equipoActual) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const nuevoEquipo = equipoActual === "A" ? "B" : "A";
+
+    const confirmar = confirm("¿Cambiar jugador al Equipo " + nuevoEquipo + "?");
+
+    if (!confirmar) {
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths=equipo";
+
+    const datos = {
+        fields: {
+            equipo: {
+                stringValue: nuevoEquipo
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo cambiar el equipo.");
+        }
+
+        await refrescarAdminJugadores();
+
+        alert("Jugador cambiado al Equipo " + nuevoEquipo + ".");
+
+    } catch (error) {
+        console.error("Error cambiando equipo:", error);
+        alert("Error al cambiar equipo. Revisa la consola.");
+    }
+}
+
+
+async function cambiarNivelJugadorAdmin(firebaseId, nivelActual) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const nuevoNivel = prompt("Nuevo nivel del jugador:", nivelActual || 1);
+
+    if (nuevoNivel === null) {
+        return;
+    }
+
+    const nivelNumero = Number(nuevoNivel);
+
+    if (!nivelNumero || nivelNumero < 1) {
+        alert("Ingresa un nivel válido.");
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths=nivel";
+
+    const datos = {
+        fields: {
+            nivel: {
+                integerValue: nivelNumero
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo cambiar el nivel.");
+        }
+
+        const jugadorActual = jugadores.find(function(jugador) {
+    return jugador.firebaseId === firebaseId;
+});
+
+console.log("Jugador encontrado para actualizar nivel:", jugadorActual);
+console.log("Nuevo nivel que se quiere guardar:", nivelNumero);
+
+if (jugadorActual && jugadorActual.whatsapp) {
+    await actualizarCampoPerfilJugador(jugadorActual.whatsapp, "nivel", nivelNumero);
+    console.log("Se mandó actualizar nivel en jugadoresPerfil:", jugadorActual.whatsapp);
+} else {
+    console.warn("No se encontró WhatsApp para actualizar nivel en jugadoresPerfil.");
+}
+        
+        await refrescarAdminJugadores();
+
+        alert("Nivel actualizado correctamente.");
+
+    } catch (error) {
+        console.error("Error cambiando nivel:", error);
+        alert("Error al cambiar nivel. Revisa la consola.");
+    }
+}
+
+
+async function eliminarJugadorAdmin(firebaseId) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const confirmar = confirm("¿Seguro que quieres eliminar este jugador de la pichanga?");
+
+    if (!confirmar) {
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey;
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "DELETE"
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo eliminar el jugador.");
+        }
+
+        await refrescarAdminJugadores();
+
+        alert("Jugador eliminado correctamente.");
+
+    } catch (error) {
+        console.error("Error eliminando jugador:", error);
+        alert("Error al eliminar jugador. Revisa la consola.");
+    }
+}
+
+
+async function refrescarAdminJugadores() {
+    const idPichanga = localStorage.getItem("pichangaSeleccionadaId") || partidoId;
+
+    await cargarJugadoresFirebase();
+    await cargarPichangasFirebase();
+    await cargarRankingDorado();
+
+    mostrarJugadoresAdminPichanga();
+    mostrarEquiposDetallePichanga();
+
+    if (idPichanga) {
+        actualizarResumenAdminPichanga(idPichanga);
+    }
+}
+
+
+async function cambiarPuntosJugadorAdmin(firebaseId, puntosActuales) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const nuevosPuntos = prompt("Nuevos puntos del jugador:", puntosActuales || 0);
+
+    if (nuevosPuntos === null) {
+        return;
+    }
+
+    const puntosNumero = Number(nuevosPuntos);
+
+    if (isNaN(puntosNumero) || puntosNumero < 0) {
+        alert("Ingresa una cantidad válida de puntos.");
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths=puntos";
+
+    const datos = {
+        fields: {
+            puntos: {
+                integerValue: puntosNumero
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo cambiar los puntos.");
+        }
+
+        const jugadorActual = jugadores.find(function(jugador) {
+    return jugador.firebaseId === firebaseId;
+});
+
+if (jugadorActual && jugadorActual.whatsapp) {
+    await actualizarCampoPerfilJugador(jugadorActual.whatsapp, "puntos", puntosNumero);
+}
+        
+        await refrescarAdminJugadores();
+    
+
+        alert("Puntos actualizados correctamente.");
+
+    } catch (error) {
+        console.error("Error cambiando puntos:", error);
+        alert("Error al cambiar puntos. Revisa la consola.");
+    }
+}
+
+
+async function cambiarPartidosJugadorAdmin(firebaseId, partidosActuales) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const nuevosPartidos = prompt("Nuevo total de partidos jugados:", partidosActuales || 0);
+
+    if (nuevosPartidos === null) {
+        return;
+    }
+
+    const partidosNumero = Number(nuevosPartidos);
+
+    if (isNaN(partidosNumero) || partidosNumero < 0) {
+        alert("Ingresa una cantidad válida de partidos.");
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths=partidosJugados";
+
+    const datos = {
+        fields: {
+            partidosJugados: {
+                integerValue: partidosNumero
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo cambiar los partidos.");
+        }
+
+        const jugadorActual = jugadores.find(function(jugador) {
+    return jugador.firebaseId === firebaseId;
+});
+
+if (jugadorActual && jugadorActual.whatsapp) {
+    await actualizarCampoPerfilJugador(jugadorActual.whatsapp, "partidosJugados", partidosNumero);
+}
+        
+        await refrescarAdminJugadores();
+
+        alert("Partidos actualizados correctamente.");
+
+    } catch (error) {
+        console.error("Error cambiando partidos:", error);
+        alert("Error al cambiar partidos. Revisa la consola.");
+    }
+}
+
+
+async function actualizarCampoPerfilJugador(whatsapp, campo, valor) {
+    const config = window.firebaseConfig;
+
+    if (!config || !whatsapp || !campo) {
+        return;
+    }
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/jugadoresPerfil/"
+        + whatsapp
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths="
+        + campo;
+
+    const datos = {
+        fields: {}
+    };
+
+    if (campo === "nivel" || campo === "puntos" || campo === "partidosJugados" || campo === "goles") {
+    datos.fields[campo] = {
+        integerValue: Number(valor)
+    };
+} else {
+    datos.fields[campo] = {
+        stringValue: String(valor)
+    };
+}
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            console.warn("No se pudo actualizar el perfil permanente del jugador:", campo);
+        }
+
+    } catch (error) {
+        console.error("Error actualizando perfil permanente:", error);
+    }
+}
+
+
+async function cambiarGolesJugadorAdmin(firebaseId, golesActuales) {
+    if (!firebaseId) {
+        alert("No se encontró el jugador.");
+        return;
+    }
+
+    const nuevosGoles = prompt("Nuevo total de goles del jugador:", golesActuales || 0);
+
+    if (nuevosGoles === null) {
+        return;
+    }
+
+    const golesNumero = Number(nuevosGoles);
+
+    if (isNaN(golesNumero) || golesNumero < 0) {
+        alert("Ingresa una cantidad válida de goles.");
+        return;
+    }
+
+    const config = window.firebaseConfig;
+
+    const url = "https://firestore.googleapis.com/v1/projects/"
+        + config.projectId
+        + "/databases/(default)/documents/inscritos/"
+        + firebaseId
+        + "?key="
+        + config.apiKey
+        + "&updateMask.fieldPaths=goles";
+
+    const datos = {
+        fields: {
+            goles: {
+                integerValue: golesNumero
+            }
+        }
+    };
+
+    try {
+        const respuesta = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(datos)
+        });
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudo cambiar los goles.");
+        }
+
+        const jugadorActual = jugadores.find(function(jugador) {
+            return jugador.firebaseId === firebaseId;
+        });
+
+        if (jugadorActual && jugadorActual.whatsapp) {
+            await actualizarCampoPerfilJugador(jugadorActual.whatsapp, "goles", golesNumero);
+        }
+
+        await refrescarAdminJugadores();
+
+        alert("Goles actualizados correctamente.");
+
+    } catch (error) {
+        console.error("Error cambiando goles:", error);
+        alert("Error al cambiar goles. Revisa la consola.");
+    }
+}
+
+async function reiniciarPuntosMensualesAdmin() {
+    const confirmacionInicial = confirm(
+        "⚠️ CIERRE MENSUAL DE PUNTOS\n\n" +
+        "Se guardará una copia del ranking actual y los puntos de todos los jugadores volverán a 0.\n\n" +
+        "Los goles, partidos y niveles no cambiarán.\n\n" +
+        "¿Deseas continuar?"
+    );
+
+    if (!confirmacionInicial) {
+        return;
+    }
+
+    const palabraSeguridad = prompt(
+        "Para confirmar el reinicio mensual escribe exactamente:\n\nREINICIAR"
+    );
+
+    if (palabraSeguridad !== "REINICIAR") {
+        alert("Reinicio cancelado. No se modificó ningún punto.");
+        return;
+    }
+
+    try {
+        const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
+        alert("Guardando ranking mensual y reiniciando puntos. Espera unos segundos...");
+
+        // 1. Obtener todos los perfiles permanentes
+        const respuestaPerfiles = await fetch(`${baseUrl}/jugadoresPerfil`);
+        const datosPerfiles = await respuestaPerfiles.json();
+
+        if (!respuestaPerfiles.ok) {
+            throw new Error("No se pudieron obtener los perfiles de jugadores.");
+        }
+
+        const perfiles = (datosPerfiles.documents || []).map(function(documento) {
+            const campos = documento.fields || {};
+
+            return {
+                idDocumento: documento.name.split("/").pop(),
+                nombre: campos.nombre ? campos.nombre.stringValue : "Jugador sin nombre",
+                whatsapp: campos.whatsapp ? campos.whatsapp.stringValue : "",
+                nivel: campos.nivel
+                    ? Number(campos.nivel.integerValue || campos.nivel.stringValue)
+                    : 1,
+                puntos: campos.puntos
+                    ? Number(campos.puntos.integerValue || campos.puntos.stringValue)
+                    : 0,
+                goles: campos.goles
+                    ? Number(campos.goles.integerValue || campos.goles.stringValue)
+                    : 0,
+                partidosJugados: campos.partidosJugados
+                    ? Number(campos.partidosJugados.integerValue || campos.partidosJugados.stringValue)
+                    : 0
+            };
+        });
+
+        // 2. Ordenar el ranking antes de reiniciar
+        perfiles.sort(function(a, b) {
+            return b.puntos - a.puntos;
+        });
+
+        const fechaActual = new Date();
+        const mesCerrado = fechaActual.toLocaleDateString("es-PE", {
+            month: "long",
+            year: "numeric"
+        });
+
+        const idHistorial = `ranking_${fechaActual.getFullYear()}_${String(
+            fechaActual.getMonth() + 1
+        ).padStart(2, "0")}_${Date.now()}`;
+
+        // 3. Guardar una copia del ranking mensual
+        const rankingParaGuardar = perfiles.map(function(jugador, indice) {
+            return {
+                mapValue: {
+                    fields: {
+                        puesto: {
+                            integerValue: indice + 1
+                        },
+                        nombre: {
+                            stringValue: jugador.nombre
+                        },
+                        whatsapp: {
+                            stringValue: jugador.whatsapp
+                        },
+                        nivel: {
+                            integerValue: jugador.nivel
+                        },
+                        puntos: {
+                            integerValue: jugador.puntos
+                        },
+                        goles: {
+                            integerValue: jugador.goles
+                        },
+                        partidosJugados: {
+                            integerValue: jugador.partidosJugados
+                        }
+                    }
+                }
+            };
+        });
+
+        const historialMensual = {
+            fields: {
+                mes: {
+                    stringValue: mesCerrado
+                },
+                cerradoEn: {
+                    timestampValue: fechaActual.toISOString()
+                },
+                totalJugadores: {
+                    integerValue: perfiles.length
+                },
+                ranking: {
+                    arrayValue: {
+                        values: rankingParaGuardar
+                    }
+                }
+            }
+        };
+
+        const respuestaHistorial = await fetch(
+            `${baseUrl}/historialRankingsMensuales/${idHistorial}`,
+            {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(historialMensual)
+            }
+        );
+
+        if (!respuestaHistorial.ok) {
+            throw new Error("No se pudo guardar el historial del ranking mensual.");
+        }
+
+        // 4. Reiniciar puntos de perfiles permanentes
+        for (const jugador of perfiles) {
+            await fetch(
+                `${baseUrl}/jugadoresPerfil/${encodeURIComponent(jugador.idDocumento)}?updateMask.fieldPaths=puntos`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        fields: {
+                            puntos: {
+                                integerValue: 0
+                            }
+                        }
+                    })
+                }
+            );
+        }
+
+        // 5. Obtener y reiniciar puntos de jugadores inscritos
+        const respuestaInscritos = await fetch(`${baseUrl}/inscritos`);
+        const datosInscritos = await respuestaInscritos.json();
+
+        if (!respuestaInscritos.ok) {
+            throw new Error("No se pudieron obtener los jugadores inscritos.");
+        }
+
+        const inscritos = datosInscritos.documents || [];
+
+        for (const documento of inscritos) {
+            const idInscrito = documento.name.split("/").pop();
+
+            await fetch(
+                `${baseUrl}/inscritos/${encodeURIComponent(idInscrito)}?updateMask.fieldPaths=puntos`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        fields: {
+                            puntos: {
+                                integerValue: 0
+                            }
+                        }
+                    })
+                }
+            );
+        }
+
+        await cargarJugadoresFirebase();
+        await cargarPichangasFirebase();
+        await cargarRankingDorado();
+
+        alert(
+            `✅ Cierre mensual completado.\n\n` +
+            `Se guardó el ranking de ${mesCerrado}.\n` +
+            `Jugadores reiniciados: ${perfiles.length}.\n\n` +
+            `El nuevo Ranking Dorado comienza desde 0 puntos.`
+        );
+
+    } catch (error) {
+        console.error("Error al reiniciar puntos mensuales:", error);
+
+        alert(
+            "❌ Ocurrió un error durante el reinicio mensual.\n\n" +
+            "No vuelvas a presionar el botón todavía. Revisa la consola para ver el detalle."
+        );
+    }
+}
+
+async function cargarRankingDorado() {
+    const listaRanking = document.getElementById("ranking-lista");
+
+    if (!listaRanking) {
+        return;
+    }
+
+    listaRanking.innerHTML = "<li>Cargando ranking...</li>";
+
+    try {
+        const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
+        const respuesta = await fetch(`${baseUrl}/jugadoresPerfil`);
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+            throw new Error("No se pudieron cargar los perfiles para el ranking.");
+        }
+
+        const jugadoresRanking = (datos.documents || []).map(function(documento) {
+            const campos = documento.fields || {};
+
+            return {
+                nombre: campos.nombre
+                    ? campos.nombre.stringValue
+                    : "Jugador Liga Dorada",
+
+                whatsapp: campos.whatsapp
+                    ? campos.whatsapp.stringValue
+                    : "",
+
+                nivel: campos.nivel
+                    ? Number(campos.nivel.integerValue || campos.nivel.stringValue)
+                    : 1,
+
+                puntos: campos.puntos
+                    ? Number(campos.puntos.integerValue || campos.puntos.stringValue)
+                    : 0
+            };
+        });
+
+        // Solo jugadores que ya consiguieron puntos este mes
+        const jugadoresConPuntos = jugadoresRanking.filter(function(jugador) {
+            return jugador.puntos > 0;
+        });
+
+        // Mayor cantidad de puntos primero
+        jugadoresConPuntos.sort(function(a, b) {
+            return b.puntos - a.puntos;
+        });
+
+        // Máximo Top 5
+        const topJugadores = jugadoresConPuntos.slice(0, 5);
+
+        listaRanking.innerHTML = "";
+
+        if (topJugadores.length === 0) {
+            listaRanking.innerHTML =
+                "<li>Aún no hay puntos registrados este mes.</li>";
+            return;
+        }
+
+        topJugadores.forEach(function(jugador, indice) {
+    const puesto = indice + 1;
+
+    const item = document.createElement("div");
+    item.className = `ranking-item ranking-top-${puesto}`;
+
+    const izquierda = document.createElement("div");
+    izquierda.className = "ranking-left";
+
+    const posicion = document.createElement("div");
+    posicion.className = "ranking-posicion";
+    posicion.textContent = puesto;
+
+    const nombre = document.createElement("div");
+    nombre.className = "ranking-nombre";
+    nombre.textContent = `${jugador.nombre || "Jugador Liga Dorada"} - ${jugador.puntos} pts`;
+
+    izquierda.appendChild(posicion);
+    izquierda.appendChild(nombre);
+
+    const emoji = document.createElement("div");
+    emoji.className = "ranking-emoji";
+
+    if (puesto === 1) {
+        emoji.textContent = "👑";
+    } else if (puesto === 2) {
+        emoji.textContent = "🔥";
+    } else if (puesto === 3) {
+        emoji.textContent = "⚽";
+    } else {
+        emoji.textContent = "";
+    }
+
+    item.appendChild(izquierda);
+    item.appendChild(emoji);
+
+    listaRanking.appendChild(item);
+});
+
+    } catch (error) {
+        console.error("Error al cargar Ranking Dorado:", error);
+
+        listaRanking.innerHTML =
+            "<li>No se pudo cargar el ranking. Intenta recargar la página.</li>";
+    }
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", cargarRankingDorado);
+} else {
+    cargarRankingDorado();
+}
+
+
+function alternarMenuPrincipal() {
+    const menu = document.getElementById("menu-navegacion");
+
+    if (!menu) {
+        return;
+    }
+
+    menu.classList.toggle("menu-abierto");
+}
+
+function cerrarMenuPrincipal() {
+    const menu = document.getElementById("menu-navegacion");
+
+    if (!menu) {
+        return;
+    }
+
+    menu.classList.remove("menu-abierto");
+}
+
+
+function configurarAccesoAdminOculto() {
+    const logo = document.getElementById("menu-logo");
+
+    if (!logo) {
+        return;
+    }
+
+    let temporizadorAdmin = null;
+    let accesoActivado = false;
+
+    function iniciarPresion() {
+        accesoActivado = false;
+
+        temporizadorAdmin = setTimeout(function() {
+            accesoActivado = true;
+
+            if (typeof activarAdmin === "function") {
+                activarAdmin();
+            }
+        }, 1600);
+    }
+
+    function cancelarPresion() {
+        clearTimeout(temporizadorAdmin);
+        temporizadorAdmin = null;
+    }
+
+    logo.addEventListener("pointerdown", iniciarPresion);
+    logo.addEventListener("pointerup", cancelarPresion);
+    logo.addEventListener("pointerleave", cancelarPresion);
+    logo.addEventListener("pointercancel", cancelarPresion);
+
+    logo.addEventListener("click", function(evento) {
+        if (accesoActivado) {
+            evento.preventDefault();
+            accesoActivado = false;
+        }
+    });
+
+    logo.addEventListener("contextmenu", function(evento) {
+        evento.preventDefault();
+    });
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", configurarAccesoAdminOculto);
+} else {
+    configurarAccesoAdminOculto();
+}
+
+async function compartirEquipos() {
+    const idPichanga = localStorage.getItem("pichangaSeleccionadaId") || partidoId;
+
+    const pichangaActual = pichangasCargadas.find(function(pichanga) {
+        return pichanga.id === idPichanga;
+    });
+
+    const equipoA = jugadores.filter(function(jugador) {
+        const equipo = String(jugador.equipo || "").trim().toUpperCase();
+
+        return equipo === "A" || equipo === "EQUIPO A";
+    });
+
+    const equipoB = jugadores.filter(function(jugador) {
+        const equipo = String(jugador.equipo || "").trim().toUpperCase();
+
+        return equipo === "B" || equipo === "EQUIPO B";
+    });
+
+    const nombrePichanga =
+        (pichangaActual && pichangaActual.nombre) ||
+        localStorage.getItem("pichangaSeleccionadaNombre") ||
+        "Pichanga Liga Dorada";
+
+    const cancha =
+        document.getElementById("detalle-pichanga-cancha")?.textContent ||
+        "Cancha por confirmar";
+
+    const hora =
+        document.getElementById("detalle-pichanga-hora")?.textContent ||
+        "Hora por confirmar";
+
+    const nombresEquipoA = equipoA.length
+        ? equipoA.map(function(jugador, indice) {
+            return `${indice + 1}. ${jugador.nombre || "Jugador Liga Dorada"}`;
+        }).join("\n")
+        : "Aún no hay jugadores asignados.";
+
+    const nombresEquipoB = equipoB.length
+        ? equipoB.map(function(jugador, indice) {
+            return `${indice + 1}. ${jugador.nombre || "Jugador Liga Dorada"}`;
+        }).join("\n")
+        : "Aún no hay jugadores asignados.";
+
+    const mensaje =
+        `⚽ *${nombrePichanga}*\n` +
+        `📍 ${cancha}\n` +
+        `🕘 ${hora}\n\n` +
+        `🟡 *EQUIPO A*\n${nombresEquipoA}\n\n` +
+        `⚫ *EQUIPO B*\n${nombresEquipoB}\n\n` +
+        `🏆 Liga Dorada`;
+
+    const enlaceWhatsApp =
+    `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+window.open(enlaceWhatsApp, "_blank");
+}
+
+async function cambiarPosicionJugadorAdmin(firebaseId, posicionActual) {
+    const posicionesValidas = [
+        "Arquero",
+        "Defensa",
+        "Mediocampista",
+        "Delantero"
+    ];
+
+    const nuevaPosicion = prompt(
+        "Cambiar posición del jugador.\n\n" +
+        "Escribe una de estas opciones:\n" +
+        "Arquero\n" +
+        "Defensa\n" +
+        "Mediocampista\n" +
+        "Delantero\n\n" +
+        `Posición actual: ${posicionActual || "No definida"}`
+    );
+
+    if (nuevaPosicion === null) {
+        return;
+    }
+
+    const posicionLimpia = nuevaPosicion.trim();
+
+    const posicionCorrecta = posicionesValidas.find(function(posicion) {
+        return posicion.toLowerCase() === posicionLimpia.toLowerCase();
+    });
+
+    if (!posicionCorrecta) {
+        alert(
+            "Posición no válida.\n\n" +
+            "Usa solamente: Arquero, Defensa, Mediocampista o Delantero."
+        );
+        return;
+    }
+
+    try {
+        const config = window.firebaseConfig;
+
+        const urlInscrito =
+            `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+            `/databases/(default)/documents/inscritos/${firebaseId}` +
+            `?updateMask.fieldPaths=posicion&key=${config.apiKey}`;
+
+        const respuestaInscrito = await fetch(urlInscrito, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                fields: {
+                    posicion: {
+                        stringValue: posicionCorrecta
+                    }
+                }
+            })
+        });
+
+        if (!respuestaInscrito.ok) {
+            throw new Error("No se pudo actualizar la posición en la pichanga.");
+        }
+
+        const jugadorActual = jugadores.find(function(jugador) {
+            return jugador.firebaseId === firebaseId;
+        });
+
+        if (jugadorActual && jugadorActual.whatsapp) {
+            const urlPerfil =
+                `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+                `/databases/(default)/documents/jugadoresPerfil/` +
+                `${encodeURIComponent(jugadorActual.whatsapp)}` +
+                `?updateMask.fieldPaths=posicion&key=${config.apiKey}`;
+
+            const respuestaPerfil = await fetch(urlPerfil, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    fields: {
+                        posicion: {
+                            stringValue: posicionCorrecta
+                        }
+                    }
+                })
+            });
+
+            if (!respuestaPerfil.ok) {
+                throw new Error(
+                    "La posición se actualizó en la pichanga, pero no en el perfil permanente."
+                );
+            }
+        }
+
+        await refrescarAdminJugadores();
+
+        alert(`✅ Posición actualizada a: ${posicionCorrecta}`);
+
+    } catch (error) {
+        console.error("Error al cambiar posición:", error);
+
+        alert(
+            "❌ No se pudo actualizar la posición.\n\n" +
+            "Revisa la consola antes de intentarlo nuevamente."
+        );
+    }
+}
+
+function mostrarConfirmacionReserva() {
+    const seccionReserva = document.getElementById("reserva-exitosa");
+
+    if (!seccionReserva) {
+        return;
+    }
+
+    seccionReserva.style.display = "block";
+
+    const nombrePichanga =
+        localStorage.getItem("pichangaSeleccionadaNombre") ||
+        "Liga Dorada";
+
+    const botonWhatsApp = document.getElementById("btn-whatsapp-pago");
+
+    if (botonWhatsApp) {
+        const mensaje =
+            `Hola, acabo de reservar mi cupo en ${nombrePichanga}. ` +
+            `Te envío mi captura de pago para confirmar mi reserva.`;
+
+        botonWhatsApp.href =
+            `https://wa.me/51978206205?text=${encodeURIComponent(mensaje)}`;
+    }
+
+    setTimeout(function() {
+        seccionReserva.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }, 150);
+}
+
+function volverAPichangasDesdeReserva() {
+    const seccionReserva = document.getElementById("reserva-exitosa");
+
+    if (seccionReserva) {
+        seccionReserva.style.display = "none";
+    }
+
+    const cartelera = document.getElementById("cartelera-pichangas");
+
+    if (cartelera) {
+        cartelera.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+    }
+}
+
+async function cambiarReputacionJugadorAdmin(firebaseId) {
+    const jugadorActual = jugadores.find(function(jugador) {
+        return jugador.firebaseId === firebaseId;
+    });
+
+    if (!jugadorActual) {
+        alert("No se encontró al jugador seleccionado.");
+        return;
+    }
+
+    const reputacionActual =
+        jugadorActual.reputacion || "Confiable 100%";
+
+    const nuevaReputacion = prompt(
+        "Cambiar reputación del jugador.\n\n" +
+        "Escribe manualmente la reputación y porcentaje.\n\n" +
+        "Ejemplos:\n" +
+        "Confiable 100%\n" +
+        "Confiable 50%\n" +
+        "Poco confiable 40%\n" +
+        "No confiable 10%",
+        reputacionActual
+    );
+
+    if (nuevaReputacion === null) {
+        return;
+    }
+
+    const reputacionLimpia = nuevaReputacion.trim();
+
+    if (!reputacionLimpia) {
+        alert("Debes escribir una reputación.");
+        return;
+    }
+
+    if (reputacionLimpia.length > 40) {
+        alert("La reputación debe tener máximo 40 caracteres.");
+        return;
+    }
+
+    try {
+        const config = window.firebaseConfig;
+
+        const urlInscrito =
+            `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+            `/databases/(default)/documents/inscritos/${firebaseId}` +
+            `?updateMask.fieldPaths=reputacion&key=${config.apiKey}`;
+
+        const respuestaInscrito = await fetch(urlInscrito, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                fields: {
+                    reputacion: {
+                        stringValue: reputacionLimpia
+                    }
+                }
+            })
+        });
+
+        if (!respuestaInscrito.ok) {
+            throw new Error("No se pudo actualizar la reputación en la pichanga.");
+        }
+
+        if (jugadorActual.whatsapp) {
+            const urlPerfil =
+                `https://firestore.googleapis.com/v1/projects/${config.projectId}` +
+                `/databases/(default)/documents/jugadoresPerfil/` +
+                `${encodeURIComponent(jugadorActual.whatsapp)}` +
+                `?updateMask.fieldPaths=reputacion&key=${config.apiKey}`;
+
+            const respuestaPerfil = await fetch(urlPerfil, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    fields: {
+                        reputacion: {
+                            stringValue: reputacionLimpia
+                        }
+                    }
+                })
+            });
+
+            if (!respuestaPerfil.ok) {
+                throw new Error(
+                    "La reputación se actualizó en la pichanga, pero no en el perfil."
+                );
+            }
+        }
+
+        await refrescarAdminJugadores();
+
+        alert(`✅ Reputación actualizada: ${reputacionLimpia}`);
+
+    } catch (error) {
+        console.error("Error al cambiar reputación:", error);
+
+        alert(
+            "❌ No se pudo actualizar la reputación.\n\n" +
+            "Revisa la consola antes de intentarlo nuevamente."
+        );
+    }
+}
